@@ -146,37 +146,38 @@ These formulas guide when and how much to order for each material, directly redu
 ## 📂 Project Structure
 
 📦 PrediChain
-└── 📁 backend
-    ├── 📁 __pycache__
-    │   └── 📄 app.cpython-313.pyc
-    ├── 🤖 ml
+
+    ├── 📁 backend
+
     │   ├── 📁 __pycache__
-    │   │   ├── __init__.cpython-313.pyc
-    │   │   ├── forecast.cpython-313.pyc
-    │   │   ├── recommendation.cpython-313.pyc
-    │   │   └── utils.cpython-313.pyc
-    │   ├── 📄 __init__.py
-    │   ├── 📄 forecast.py           # Forecasting logic (Prophet, etc.)
-    │   ├── 📄 recommendation.py     # Material recommendation logic
-    │   └── 📄 utils.py              # Helper functions (data cleaning, validation)
-    ├── 📁 data
-    │   ├── 📁 uploads               # User-uploaded datasets
-    │   │   ├── 📄 generate_sample_data.py
-    │   │   └── 📄 realistic_project_data.csv
-    │   ├── 📁 forecasts             # Generated forecast outputs
-    │   └── 📄 cement_forecast.csv
-    ├── ⚙️ app.py                    # FastAPI app entry point
-    ├── 📄 requirements.txt          # Dependency list
-    ├── 📄 generate_sample_data.py   # Script to generate sample/synthetic data
-    ├── 🧠 venv                      # Virtual environment
-    │   ├── 📁 Include/
-    │   ├── 📁 Lib/
-    │   ├── 📁 Scripts/
-    │   │   ├── 📁 share/
-    │   │   ├── 📄 .gitignore
-    │   │   └── 📄 pyvenv.cfg
-    ├── 📄 .gitignore
-    └── 📝 README.md
+            └── 📄 app.cpython-313.pyc
+
+    │   ├── 🤖 ml
+            │   ├── 📁 __pycache__/
+            │   ├── 📄 __init__.py
+            │   ├── 📄 forecast.py           # Forecasting logic (Prophet, etc.)
+            │   ├── 📄 recommendation.py     # Material recommendation logic
+            │   └── 📄 utils.py              # Helper functions (data cleaning, validation)
+
+    │  ├── 📁 data
+            │   ├── 📁 uploads               # User-uploaded datasets
+            │   │   ├── 📄 generate_sample_data.py
+            │   │   └── 📄 realistic_project_data.csv
+            │   ├── 📁 forecasts             # Generated forecast outputs
+            │        └── 📄 cement_forecast.csv
+
+    │  ├── ⚙️ app.py                    # FastAPI app entry point
+    │  ├── 📄 requirements.txt          # Dependency list
+    │  ├── 📄 generate_sample_data.py   # Script to generate sample/synthetic data
+    │  ├── 🧠 venv                      # Virtual environment
+    │  │   ├── 📁 Include/
+    │  │   ├── 📁 Lib/
+    │  │   ├── 📁 Scripts/
+    │  │   ├── 📁 share/
+    │  │   ├── 📄 .gitignore
+    │  │   └── 📄 pyvenv.cfg
+    │  ├── 📄 .gitignore
+    │  └── 📝 README.md
 
 
 ---
