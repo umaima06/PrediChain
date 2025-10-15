@@ -144,11 +144,11 @@ These formulas guide when and how much to order for each material, directly redu
 ---
 
 ## 📂 Project Structure
+
 📦 PrediChain
 └── 📁 backend
     ├── 📁 __pycache__
     │   └── 📄 app.cpython-313.pyc
-
     ├── 🤖 ml
     │   ├── 📁 __pycache__
     │   │   ├── __init__.cpython-313.pyc
@@ -159,14 +159,12 @@ These formulas guide when and how much to order for each material, directly redu
     │   ├── 📄 forecast.py           # Forecasting logic (Prophet, etc.)
     │   ├── 📄 recommendation.py     # Material recommendation logic
     │   └── 📄 utils.py              # Helper functions (data cleaning, validation)
-
     ├── 📁 data
     │   ├── 📁 uploads               # User-uploaded datasets
     │   │   ├── 📄 generate_sample_data.py
     │   │   └── 📄 realistic_project_data.csv
     │   ├── 📁 forecasts             # Generated forecast outputs
     │   └── 📄 cement_forecast.csv
-
     ├── ⚙️ app.py                    # FastAPI app entry point
     ├── 📄 requirements.txt          # Dependency list
     ├── 📄 generate_sample_data.py   # Script to generate sample/synthetic data
