@@ -1,0 +1,48 @@
+# --- General Python/Virtual Environment ---
+Byte-compiled Python files
+pycache/
+*.pyc
+
+Recursively ignore Python bytecode across all folders (e.g., inside ml/)
+**/pycache/
+**/*.pyc
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Ignore venv contents specifically
+venv/Include/
+venv/Lib/
+venv/Scripts/
+venv/share/
+venv/pyvenv.cfg
+
+# Also ignore the .gitignore that might be inside venv
+venv/.gitignore
+
+External dependencies (installed by pip)
+This is typically where your Prophet, Pandas, FastAPI, etc. libraries sit.
+They should always be installed using requirements.txt
+.Python
+
+--- ML/Application Generated Files ---
+These folders contain user uploads and temporary forecast results.
+They should NOT be tracked by Git.
+data/uploads/
+data/forecasts/
+
+# Ignore the sample data file if you want teammates to generate it themselves
+# using generate_sample_data.py, which is highly recommended.
+# realistic_project_data.csv
+# cement_forecast.csv
+
+--- Frontend (Future) Dependencies ---
+Node.js dependencies for the React frontend you're about to build.
+node_modules/
+
+--- Operating System & Editor Files ---
+.DS_Store
+*.swp
