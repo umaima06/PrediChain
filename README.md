@@ -143,6 +143,75 @@ These formulas guide when and how much to order for each material, directly redu
 
 ---
 
+## Project Structure
+backend/
+
+│
+
+├─ _pycache_
+
+ │ ├─ app.cpython-313.pyc
+
+├─ ml/
+
+│ ├─ _pycache_
+
+     │ ├─__init__.cpython-313.pyc
+
+│ ├─forecast.cpython-313.pyc
+
+ │ ├─recommendation.cpython-313.pyc
+
+      │ ├─utils.cpython-313.pyc
+
+│ ├─ __init__.py
+
+│ ├─ forecast.py # forecasting logic (Prophet etc.)
+
+│ ├─recommendation.py
+
+│ ├─ utils.py # helper functions (cleaning, validation)
+
+│
+
+├─ data/
+
+│ ├─ uploads/ # where user CSVs go
+
+      │ ├─generate_sample_data.py
+
+      │ ├─realistic_project_data.csv
+
+│ ├─ forecasts/ # where forecast outputs saved
+
+│ ├─cement_forecast.csv
+
+│
+
+├─ app.py
+
+├─ requirements.txt
+
+├─generate_sample_data.py
+
+├─venv
+
+     │ ├─Include/
+
+     │ ├─Lib/
+
+     │ ├─Scripts/
+
+        │ ├─share/
+
+        │ ├─.gitignore
+
+        │ ├─pyvenv.cfg
+
+├─.gitignore
+
+└─ README.md
+
 ## 📉 Sample Output
 | Month | Material | Forecast (Tons) | Safety Stock | Reorder Point | Suggested Order |
 |--------|-----------|----------------|---------------|----------------|-----------------|
