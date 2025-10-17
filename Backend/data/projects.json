@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "owner": "me",
+    "name": "Bridge Construction A",
+    "location": "City X",
+    "type": "Bridge",
+    "startDate": "2025-11-01",
+    "endDate": "2026-06-30",
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "owner": "other",
+    "name": "Highway Expansion B",
+    "location": "City Y",
+    "type": "Road",
+    "startDate": "2025-12-15",
+    "endDate": "2026-09-20",
+    "status": "Upcoming"
+  },
+  {
+    "id": 3,
+    "owner": "me",
+    "name": "Tunnel C",
+    "location": "City Z",
+    "type": "Tunnel",
+    "startDate": "2026-01-01",
+    "endDate": "2026-12-31",
+    "status": "Active"
+  },
+  {
+    "id": 4,
+    "owner": "other",
+    "name": "Bridge D",
+    "location": "City W",
+    "type": "Bridge",
+    "startDate": "2025-09-01",
+    "endDate": "2026-05-15",
+    "status": "Completed"
+  },
+  {
+    "id": 5,
+    "owner": "me",
+    "name": "Road E",
+    "location": "City Q",
+    "type": "Road",
+    "startDate": "2025-10-20",
+    "endDate": "2026-08-10",
+    "status": "Upcoming"
+  },
+  {
+    "id": 6,
+    "owner": "other",
+    "name": "Building F",
+    "location": "City M",
+    "type": "Building",
+    "startDate": "2025-08-10",
+    "endDate": "2026-04-25",
+    "status": "Active"
+  },
+  {
+    "id": 7,
+    "owner": "me",
+    "name": "Bridge G",
+    "location": "City R",
+    "type": "Bridge",
+    "startDate": "2025-07-01",
+    "endDate": "2026-03-15",
+    "status": "Completed"
+  },
+  {
+    "id": 8,
+    "owner": "other",
+    "name": "Tunnel H",
+    "location": "City S",
+    "type": "Tunnel",
+    "startDate": "2025-11-20",
+    "endDate": "2026-07-30",
+    "status": "Upcoming"
+  }
+]
