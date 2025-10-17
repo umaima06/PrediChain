@@ -181,6 +181,34 @@ These formulas guide when and how much to order for each material, directly redu
 
 
 ---
+    
+📦 predichain-frontend
+├── 📁 public
+│   ├── index.html
+│   ├── manifest.json
+│   └── robots.txt
+├── 📁 src
+│   ├── 📁 components
+│   │   ├── BenefitCard.jsx
+│   │   ├── FeatureCard.jsx
+│   │   ├── Footer.jsx
+│   │   ├── Hero.jsx
+│   │   ├── LiquidEther.js
+│   │   ├── LiquidEther.css
+│   │   ├── Navbar.jsx
+│   │   └── ThemeToggle.jsx
+│   ├── 📁 pages
+│   │   ├── Auth.jsx
+│   │   ├── Home.jsx
+│   │   └── ProjectManagement.jsx
+│   ├── App.js
+│   ├── index.js
+│   └── index.css
+├── .gitignore
+├── package.json
+└── package-lock.json
+
+---
 
 ## 📉 Sample Output
 | Month | Material | Forecast (Tons) | Safety Stock | Reorder Point | Suggested Order |
@@ -220,8 +248,19 @@ These formulas guide when and how much to order for each material, directly redu
 git clone https://github.com/yourusername/PrediChain.git
 cd PrediChain
 
+#Run backend
 # Install dependencies
 pip install -r requirements.txt
 
 # Run the notebook or dashboard
 streamlit run app.py
+
+#Run frontend
+# Go to frontend folder
+cd frontend/predichain-frontend
+
+# Install dependencies
+npm install
+
+# Run React app
+npm start
