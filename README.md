@@ -181,32 +181,39 @@ These formulas guide when and how much to order for each material, directly redu
 
 
 ---
+
     
-📦 predichain-frontend
-├── 📁 public
-│   ├── index.html
-│   ├── manifest.json
-│   └── robots.txt
-├── 📁 src
-│   ├── 📁 components
-│   │   ├── BenefitCard.jsx
-│   │   ├── FeatureCard.jsx
-│   │   ├── Footer.jsx
-│   │   ├── Hero.jsx
-│   │   ├── LiquidEther.js
-│   │   ├── LiquidEther.css
-│   │   ├── Navbar.jsx
-│   │   └── ThemeToggle.jsx
-│   ├── 📁 pages
-│   │   ├── Auth.jsx
-│   │   ├── Home.jsx
-│   │   └── ProjectManagement.jsx
-│   ├── App.js
-│   ├── index.js
-│   └── index.css
-├── .gitignore
-├── package.json
-└── package-lock.json
+├── 📁 frontend
+│   ├── 📁 predichain-frontend
+│   │   ├── 📁 public
+│   │   │   ├── 📄 index.html
+│   │   │   ├── 📄 manifest.json
+│   │   │   └── 📄 robots.txt
+│   │   │
+│   │   ├── 📁 src
+│   │   │   ├── 📁 components
+│   │   │   │   ├── 📄 BenefitCard.jsx
+│   │   │   │   ├── 📄 FeatureCard.jsx
+│   │   │   │   ├── 📄 Footer.jsx
+│   │   │   │   ├── 📄 Hero.jsx
+│   │   │   │   ├── 📄 LiquidEther.js
+│   │   │   │   ├── 📄 LiquidEther.css
+│   │   │   │   ├── 📄 Navbar.jsx
+│   │   │   │   └── 📄 ThemeToggle.jsx
+│   │   │   │
+│   │   │   ├── 📁 pages
+│   │   │   │   ├── 📄 Auth.jsx
+│   │   │   │   ├── 📄 Home.jsx
+│   │   │   │   └── 📄 ProjectManagement.jsx
+│   │   │   │
+│   │   │   ├── 📄 App.js
+│   │   │   ├── 📄 index.js
+│   │   │   └── 📄 index.css
+│   │   │
+│   │   ├── 📄 .gitignore
+│   │   ├── 📄 package.json
+│   │   └── 📄 package-lock.json
+
 
 ---
 
