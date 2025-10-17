@@ -183,7 +183,7 @@ These formulas guide when and how much to order for each material, directly redu
 ---
 
  ##  📦 PrediChain Frontend folder structure 
- 
+ ```
 ├── 📁 frontend
 │   ├── 📁 predichain-frontend
 │   │   ├── 📁 public
@@ -214,7 +214,6 @@ These formulas guide when and how much to order for each material, directly redu
 │   │   ├── 📄 .gitignore
 │   │   ├── 📄 package.json
 │   │   └── 📄 package-lock.json
-
 
 ---
 
