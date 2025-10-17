@@ -218,6 +218,7 @@ These formulas guide when and how much to order for each material, directly redu
 ---
 
 ## 📉 Sample Output
+```
 | Month | Material | Forecast (Tons) | Safety Stock | Reorder Point | Suggested Order |
 |--------|-----------|----------------|---------------|----------------|-----------------|
 | Nov 2025 | Cement | 420 | 40 | 460 | 480 |
@@ -250,6 +251,7 @@ These formulas guide when and how much to order for each material, directly redu
 ---
 
 ## ⚡ How to Run (Local)
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/PrediChain.git
