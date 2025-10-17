@@ -1,0 +1,40 @@
+/* Tailwind base files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Site theme variables */
+:root {
+  --bg-light: #F5F7FA;
+  --bg-dark: #0F172A;
+  --primary: #3B82F6;
+  --secondary: #1F2937;
+  --accent: #10B981;
+}
+
+[data-theme="dark"] {
+  --bg-light: #0F172A;
+  --bg-dark: #F5F7FA;
+  --primary: #3B82F6;
+  --secondary: #E5E7EB;
+  --accent: #10B981;
+}
+
+/* Gradient animation */
+@keyframes gradientBackground {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradientBackground {
+  background-size: 200% 200%;
+  animation: gradientBackground 10s ease infinite;
+}
+
+/* Tailwind custom colors fallback if needed */
+.bg-light { background-color: var(--bg-light); }
+.bg-dark { background-color: var(--bg-dark); }
+.text-primary { color: var(--primary); }
+.text-secondary { color: var(--secondary); }
+.bg-accent { background-color: var(--accent); }
