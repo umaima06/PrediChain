@@ -45,4 +45,4 @@ node_modules/
 
 --- Operating System & Editor Files ---
 .DS_Store
-*.swp
+*.swp"Backend/serviceAccountKey.json" 
