@@ -1,73 +1,65 @@
 import pandas as pd
 from prophet import Prophet
 import os
-from .utils import clean_and_validate_data 
+from .utils import clean_and_validate_data
 
 FORECAST_DIR = "data/forecasts"
 os.makedirs(FORECAST_DIR, exist_ok=True)
 
 def generate_forecast(df: pd.DataFrame, material: str, horizon_months: int = 6):
-    
-    required_cols = ["date", "material", "quantity_used", "rainfall_mm"] 
-    # 1. Cleaning and Validation
-    df_clean = clean_and_validate_data(df, required_cols) 
-    
-    # 2. Filter for the specific material
-    df_material = df_clean[df_clean["material"].str.lower() == material.lower()]
+    """
+    Generates monthly forecast from historical CSV for a given material.
+    Uses optional regressors if available in the historical CSV.
+    """
+    # Required columns
+    required_cols = ["Date_of_Materail_Usage", "Quantity_Used", "Material_Name"]
+    df_clean = clean_and_validate_data(df, required_cols)
+
+    # Optional regressors from historical CSV
+    optional_cols = [
+        "Weather_Condition", "Regional_Risk_Level", "Delivery_Delays",
+        "Average_Delivery_Time_Days", "Contractor_Team_Size", "Number_of_Shifts_Work_Hours"
+    ]
+    for col in optional_cols:
+        if col not in df_clean.columns:
+            df_clean[col] = 0  # Fill missing optional features with default
+
+    # Filter for the selected material
+    df_material = df_clean[df_clean["Material_Name"].str.lower() == material.lower()]
     if df_material.empty:
-        raise ValueError(f"No data found for material '{material}' after cleaning and filtering.")
+        raise ValueError(f"No data found for material '{material}' after filtering.")
 
-    # 3. Prepare data for Prophet (ds, y)
-    df_prophet = df_material.rename(columns={"date": "ds", "quantity_used": "y"})
-    df_prophet = df_prophet[["ds", "y", "rainfall_mm"]].sort_values("ds") 
+    # Prepare dataframe for Prophet
+    df_prophet = df_material.rename(columns={"Date_of_Materail_Usage": "ds", "Quantity_Used": "y"})
+    df_prophet = df_prophet[["ds", "y"] + optional_cols].sort_values("ds")
+    df_prophet['ds'] = pd.to_datetime(df_prophet['ds'])
 
-    # 4. Prophet Model Fit and Forecast
+    # Prophet model
     model = Prophet(yearly_seasonality=True)
-    
-    # Add the exogenous variable (regressor)
-    model.add_regressor('rainfall_mm') 
-    
+    for col in optional_cols:
+        model.add_regressor(col)
     model.fit(df_prophet)
 
-    # --- Prepare Future DataFrame with Forecasted Regressor ---
+    # Future dataframe
+    future = model.make_future_dataframe(periods=horizon_months*30, freq='D')
+    for col in optional_cols:
+        # Use historical mean for future regressors
+        future[col] = df_prophet[col].mean()
     
-    # Calculate daily average rainfall pattern (month-day average) for projection
-    df_prophet['month_day'] = df_prophet['ds'].dt.strftime('%m-%d')
-    # Use mean of rainfall for each day of the year (e.g., mean rainfall on Jan 1st)
-    avg_rainfall_pattern = df_prophet.groupby('month_day')['rainfall_mm'].mean().reset_index()
-    
-    # Create future dataframe
-    future = model.make_future_dataframe(periods=horizon_months * 30, freq='D') 
-    future['month_day'] = future['ds'].dt.strftime('%m-%d')
-    
-    # Merge the future dates with the historical average rainfall pattern
-    future = pd.merge(future, avg_rainfall_pattern, on='month_day', how='left')
-    future.drop(columns=['month_day'], inplace=True)
-    
-    # Fill any NaNs (should be few if historical data covers a full year) with the overall mean
-    future['rainfall_mm'].fillna(future['rainfall_mm'].mean(), inplace=True) 
-
-    # Predict
     forecast = model.predict(future)
 
-    # 5. Extract and finalize forecast (Aggregation)
-    # The forecast is currently daily. Aggregate to monthly.
-    forecast_out = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(horizon_months * 30)
-    
+    # Aggregate to monthly
+    forecast_out = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(horizon_months*30)
     forecast_out['ds'] = pd.to_datetime(forecast_out['ds'])
-    
-    # CRITICAL FIX: Sum 'yhat' (the forecast) but use the MEAN of confidence intervals 
-    # to avoid falsely expanding the uncertainty bounds.
     monthly_forecast = forecast_out.set_index('ds').resample('M').agg({
-        'yhat': 'sum',           # Sum the predicted demand
-        'yhat_lower': 'mean',    # Use mean for lower confidence bound
-        'yhat_upper': 'mean'     # Use mean for upper confidence bound
+        'yhat': 'sum',
+        'yhat_lower': 'mean',
+        'yhat_upper': 'mean'
     }).reset_index()
-
-    # Finalize output
     monthly_forecast["material"] = material
     monthly_forecast.rename(columns={'ds': 'forecast_date'}, inplace=True)
 
+    # Save CSV
     out_path = os.path.join(FORECAST_DIR, f"{material}_forecast.csv")
     monthly_forecast.to_csv(out_path, index=False)
 
