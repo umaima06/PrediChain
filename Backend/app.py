@@ -125,6 +125,28 @@ import json
 from ml.forecast import generate_forecast
 from ml.recommendation import generate_procurement_recommendations
 
+# inside backend/app.py (add imports)
+from fastapi import Depends, Header
+from firebase_admin_auth import verify_firebase_token
+
+# Auth dependency
+def get_current_user(authorization: str = Header(None)):
+    """
+    Expects header: Authorization: Bearer <idToken>
+    Returns decoded token dict or raises 401.
+    """
+    from fastapi import HTTPException
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    parts = authorization.split()
+    if parts[0].lower() != "bearer" or len(parts) != 2:
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    id_token = parts[1]
+    decoded = verify_firebase_token(id_token)
+    if not decoded:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return decoded
+
 app = FastAPI(title="PrediChain Backend", version="1.0")
 
 # --- Directories ---
@@ -152,7 +174,7 @@ def health_check():
 
 # --- Project Management ---
 @app.get("/projects")
-def get_projects():
+def get_projects(user: dict = Depends(get_current_user)):
     with open(PROJECTS_FILE, "r") as f:
         projects = json.load(f)
     return projects
@@ -307,3 +329,7 @@ def recommend_procurement(
         "forecast": forecast_df.to_dict(orient="records"),
         "recommendations": recommendation_df.to_dict(orient="records")
     }
+
+@app.get("/")
+def root():
+    return {"message": "Welcome to PrediChain Backend", "status": "running"}

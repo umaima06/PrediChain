@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import LiquidEther from '../components/LiquidEther';
 import { FaPlus, FaMapMarkerAlt, FaProjectDiagram, FaTrash } from 'react-icons/fa';
+import { getAuth } from 'firebase/auth';
 
 const ProjectManagement = () => {
   const [projects, setProjects] = useState([]);
@@ -20,11 +21,41 @@ const ProjectManagement = () => {
   };
 
   useEffect(() => {
-    // Fetch projects from backend JSON
-    axios.get('http://127.0.0.1:8000/projects')
-      .then(res => setProjects(res.data))
-      .catch(err => console.error("Error fetching projects:", err));
-  }, []);
+    const auth = getAuth(); // Get the Firebase Auth instance
+    const user = auth.currentUser; // Get the currently logged-in user
+    const fetchProjects = async () => {
+      if (!user) {
+        // User is not logged in, redirect to auth page
+        navigate('/'); 
+        return;
+      }
+      
+      try {
+        // Get the ID token for the backend
+        const idToken = await user.getIdToken(); 
+
+        // Fetch projects from backend, sending the token
+        const res = await axios.get('http://127.0.0.1:8000/projects', {
+          headers: {
+            // CRUCIAL: Send the token in the Authorization header
+            'Authorization': `Bearer ${idToken}` 
+          }
+        });
+        setProjects(res.data);
+      } catch (err) {
+        console.error("Error fetching projects:", err);
+        // Optional: Clear projects or show a specific error message
+        }
+      };
+      
+      fetchProjects();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]); // Add navigate as dependency
+//   // Fetch projects from backend JSON
+//   axios.get('http://127.0.0.1:8000/projects')
+//   .then(res => setProjects(res.data))
+//   .catch(err => console.error("Error fetching projects:", err));
+// }, [];
 
   const handleInputChange = (e) => setNewProject({ ...newProject, [e.target.name]: e.target.value });
 
@@ -32,8 +63,16 @@ const ProjectManagement = () => {
     e.preventDefault();
     if (!newProject.name || !newProject.type) return;
 
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return; // Should not happen if page is guarded
+
     try {
+      const idToken = await user.getIdToken(); 
       const formData = new FormData();
+      setProjects([...projects, res.data]);
+      setNewProject({ name: '', location: '', type: '', startDate: '', endDate: '' });
+      setShowForm(false);
       formData.append("name", newProject.name);
       formData.append("location", newProject.location);
       formData.append("type", newProject.type);
@@ -41,7 +80,11 @@ const ProjectManagement = () => {
       formData.append("endDate", newProject.endDate);
       formData.append("owner", "me");
 
-      const res = await axios.post('http://127.0.0.1:8000/projects', formData);
+      const res = await axios.post('http://127.0.0.1:8000/projects', formData, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`, 
+        }
+      });
       setProjects([...projects, res.data]);
       setNewProject({ name: '', location: '', type: '', startDate: '', endDate: '' });
       setShowForm(false);

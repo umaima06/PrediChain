@@ -1,9 +1,128 @@
 import React, { useState } from 'react';
 import LiquidEther from '../components/LiquidEther';
+import axiosInstance from "../components/axiosConfig.js";
 import { FaGoogle } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import { auth, googleProvider, db } from '../firebase';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  updateProfile
+} from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const Auth = () => {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Helper: check username uniqueness (simple approach using users collection)
+  async function isUsernameTaken(u) {
+    if (!u) return false;
+    // We store usernames as a map doc 'usernames/{username}' to enforce uniqueness.
+    const snap = await getDoc(doc(db, 'usernames', u.toLowerCase()));
+    return snap.exists();
+  }
+
+  // When new user signs up with email
+  async function handleEmailSignup(e) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // check username
+      const taken = await isUsernameTaken(username);
+      if (taken) {
+        alert('Username taken — choose another.');
+        setLoading(false);
+        return;
+      }
+
+      // const res = await createUserWithEmailAndPassword(auth, email, password);
+      // update firebase auth profile
+      await updateProfile(res.user, { displayName: username });
+
+      // store user doc
+      await setDoc(doc(db, 'users', res.user.uid), {
+        uid: res.user.uid,
+        email: res.user.email,
+        username,
+        provider: 'password',
+        createdAt: new Date().toISOString()
+      });
+
+      // write a username lock for uniqueness
+      await setDoc(doc(db, 'usernames', username.toLowerCase()), {
+        uid: res.user.uid,
+        username,
+        createdAt: new Date().toISOString()
+      });
+
+      // get id token (send to backend if you want server sessions)
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(res.user, { displayName: username });
+      const token = await res.user.getIdToken();
+      console.log('Signed up. ID token:', token);
+
+
+      // redirect or update UI
+      navigate('/projects');
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Signup failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEmailLogin(e) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await signInWithEmailAndPassword(auth, email, password);
+      const token = await res.user.getIdToken();
+      console.log('Logged in. ID token:', token);
+      navigate('/projects');
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleAuth() {
+    setLoading(true);
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      const u = res.user;
+      // merge user into Firestore (if new user, create record)
+      await setDoc(doc(db, 'users', u.uid), {
+        uid: u.uid,
+        email: u.email,
+        username: u.displayName || '',
+        provider: 'google',
+        photoURL: u.photoURL || '',
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+
+      // note: we are NOT reserving username for google users automatically.
+      const token = await u.getIdToken();
+      console.log('Google sign-in token:', token);
+
+      // Call backend with token
+      navigate('/projects');
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
@@ -48,13 +167,16 @@ const Auth = () => {
             <div className="w-1/2 p-12 flex flex-col justify-center bg-white dark:bg-gray-900 rounded-r-3xl transition-colors duration-500">
               <h2 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">{isLogin ? 'Sign In' : 'Sign Up'}</h2>
               
-              <form className="flex flex-col gap-4">
+              <form className="flex flex-col gap-4"
+                onSubmit={isLogin ? handleEmailLogin : handleEmailSignup}>
                 {!isLogin && (
                   <div className="flex flex-col">
                     <label className="mb-1 font-semibold text-gray-700 dark:text-gray-200">Username</label>
                     <input
                       type="text"
                       placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       className="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#5C3AFF]"
                     />
                   </div>
@@ -65,7 +187,10 @@ const Auth = () => {
                   <input
                     type="email"
                     placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#5C3AFF]"
+                    autoComplete="email"
                   />
                 </div>
                 
@@ -74,7 +199,10 @@ const Auth = () => {
                   <input
                     type="password"
                     placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#5C3AFF]"
+                    autoComplete={isLogin ? "current-password" : "new-password"}
                   />
                 </div>
 
@@ -87,6 +215,7 @@ const Auth = () => {
 
                 <button
                   type="button"
+                  onClick={handleGoogleAuth}
                   className="mt-2 border border-[#5C3AFF] py-2 rounded-lg flex items-center justify-center gap-2 text-[#5C3AFF] hover:bg-[#5C3AFF]/20 transition"
                 >
                   <FaGoogle /> {isLogin ? 'Sign in with Google' : 'Sign up with Google'}

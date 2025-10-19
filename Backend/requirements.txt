@@ -5,3 +5,5 @@ numpy
 prophet
 scikit-learn
 python-multipart
+firebase-admin
+python-dotenv
