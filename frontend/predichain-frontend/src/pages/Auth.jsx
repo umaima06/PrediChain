@@ -41,7 +41,7 @@ const Auth = () => {
         return;
       }
 
-      // const res = await createUserWithEmailAndPassword(auth, email, password);
+      const res = await createUserWithEmailAndPassword(auth, email, password);
       // update firebase auth profile
       await updateProfile(res.user, { displayName: username });
 
@@ -61,22 +61,19 @@ const Auth = () => {
         createdAt: new Date().toISOString()
       });
 
-      // get id token (send to backend if you want server sessions)
-      const res = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(res.user, { displayName: username });
-      const token = await res.user.getIdToken();
-      console.log('Signed up. ID token:', token);
-
-
-      // redirect or update UI
-      navigate('/projects');
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Signup failed');
-    } finally {
-      setLoading(false);
+       // optional: get token
+       const token = await res.user.getIdToken();
+       console.log('Signed up. ID token:', token);
+       
+       navigate('/projects');
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Signup failed');
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+
 
   async function handleEmailLogin(e) {
     e.preventDefault();
