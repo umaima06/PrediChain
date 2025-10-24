@@ -8,6 +8,38 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import LiquidEther from '../components/LiquidEther';
 
+// Dummy Projects for initial display
+const DUMMY_PROJECTS = [
+  {
+    name: "Bridge Construction Alpha",
+    location: "Mumbai",
+    type: "Bridge",
+    startDate: "2025-10-01",
+    endDate: "2026-03-01",
+    status: "Active",
+    owner: "dummy"
+  },
+  {
+    name: "Highway Expansion Beta",
+    location: "Delhi",
+    type: "Road",
+    startDate: "2025-09-15",
+    endDate: "2026-02-15",
+    status: "Upcoming",
+    owner: "dummy"
+  },
+  {
+    name: "Skyscraper Project Gamma",
+    location: "Bangalore",
+    type: "Building",
+    startDate: "2025-11-01",
+    endDate: "2026-07-01",
+    status: "Upcoming",
+    owner: "dummy"
+  },
+];
+
+
 const ProjectManagement = () => {
   const [projects, setProjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -40,6 +72,19 @@ const ProjectManagement = () => {
         const userProjectsRef = collection(db, "users", user.uid, "projects");
         const snapshot = await getDocs(userProjectsRef);
         const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+         // ✅ Only add dummy projects if they are NOT already in Firestore
+        for (let dummy of DUMMY_PROJECTS) {
+          const exists = userProjects.find(p => p.name === dummy.name);
+          if (!exists) {
+            const docRef = await addDoc(userProjectsRef, {
+              ...dummy,
+              owner: user.email || user.uid
+            });
+            userProjects.push({ id: docRef.id, ...dummy, owner: user.email || user.uid });
+          }
+        }
+
         setProjects(userProjects);
       } catch (err) {
         console.error("Error fetching projects:", err);

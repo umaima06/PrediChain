@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import LiquidEther from '../components/LiquidEther';
-import axiosInstance from "../components/axiosConfig.js";
+// import axiosInstance from "../components/axiosConfig.js";
 import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider, db } from '../firebase';
@@ -10,7 +10,14 @@ import {
   signInWithPopup,
   updateProfile
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, addDoc } from 'firebase/firestore';
+
+// Dummy Projects for new users
+const DUMMY_PROJECTS = [
+  { name: "Bridge Construction Alpha", location: "Mumbai", type: "Bridge", startDate: "2025-10-01", endDate: "2026-03-01", status: "Active" },
+  { name: "Highway Expansion Beta", location: "Delhi", type: "Road", startDate: "2025-09-15", endDate: "2026-02-15", status: "Upcoming" },
+  { name: "Skyscraper Project Gamma", location: "Bangalore", type: "Building", startDate: "2025-11-01", endDate: "2026-07-01", status: "Upcoming" },
+];
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -26,6 +33,21 @@ const Auth = () => {
     // We store usernames as a map doc 'usernames/{username}' to enforce uniqueness.
     const snap = await getDoc(doc(db, 'usernames', u.toLowerCase()));
     return snap.exists();
+  }
+
+  // Create dummy projects for a user if they don't exist
+  async function createDummyProjectsIfNotExists(user) {
+    const userProjectsRef = collection(db, "users", user.uid, "projects");
+    const snapshot = await getDocs(userProjectsRef);
+    const userProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    for (let dummy of DUMMY_PROJECTS) {
+      const exists = userProjects.find(p => p.name === dummy.name);
+      if (!exists) {
+        const docRef = await addDoc(userProjectsRef, { ...dummy, owner: user.email || user.uid });
+        userProjects.push({ id: docRef.id, ...dummy, owner: user.email || user.uid });
+      }
+    }
   }
 
   // When new user signs up with email
@@ -64,7 +86,10 @@ const Auth = () => {
        // optional: get token
        const token = await res.user.getIdToken();
        console.log('Signed up. ID token:', token);
-       
+       const user = auth.currentUser; // get fully authenticated user
+       if (user) {
+        await createDummyProjectsIfNotExists(user);
+      }
        navigate('/projects');
       } catch (err) {
         console.error(err);
@@ -74,7 +99,6 @@ const Auth = () => {
       }
     }
 
-
   async function handleEmailLogin(e) {
     e.preventDefault();
     setLoading(true);
@@ -82,6 +106,10 @@ const Auth = () => {
       const res = await signInWithEmailAndPassword(auth, email, password);
       const token = await res.user.getIdToken();
       console.log('Logged in. ID token:', token);
+      const user = auth.currentUser; // get fully authenticated user
+      if (user) {
+        await createDummyProjectsIfNotExists(user);
+      }
       navigate('/projects');
     } catch (err) {
       console.error(err);
