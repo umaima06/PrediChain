@@ -1,10 +1,10 @@
-// frontend/predichain-frontend/src/components/Layout.jsx
 import React, { useState, useEffect } from 'react';
 import { FaProjectDiagram, FaTachometerAlt, FaChartLine, FaBoxes, FaChartPie, FaCog, FaBell, FaUserCircle } from 'react-icons/fa';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useLocation, useParams } from 'react-router-dom';
 
 const sidebarLinks = [
   { name: "Projects", icon: <FaProjectDiagram /> },
@@ -15,13 +15,16 @@ const sidebarLinks = [
   { name: "Settings", icon: <FaCog /> },
 ];
 
-const Layout = ({ children, projectName = "PrediChain Project", projectStatus = "Active" }) => {
+const Layout = ({ children }) => {
+  const { projId } = useParams();
+  const location = useLocation(); // to get CSV updated data
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [currentProject, setCurrentProject] = useState(null);
 
-  // Fetch notifications for current user
+  // Fetch notifications
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -35,14 +38,40 @@ const Layout = ({ children, projectName = "PrediChain Project", projectStatus = 
         console.error("Error fetching notifications:", err);
       }
     };
-
     fetchNotifications();
   }, []);
+
+  // Fetch project data from Firestore
+  useEffect(() => {
+    if (!projId) return;
+
+    const fetchProject = async () => {
+      try {
+        const docRef = doc(db, 'projects', projId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setCurrentProject(docSnap.data());
+        } else {
+          console.warn("No such project in Firestore!");
+        }
+      } catch (err) {
+        console.error("Error fetching project:", err);
+      }
+    };
+
+    fetchProject();
+  }, [projId]);
+
+  // Update project if CSV page sends updated metadata
+  useEffect(() => {
+    if (location.state?.projectData) {
+      setCurrentProject(prev => ({ ...prev, ...location.state.projectData }));
+    }
+  }, [location.state?.projectData]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // Optionally redirect to login
       window.location.href = "/login";
     } catch (err) {
       console.error("Logout failed:", err);
@@ -51,7 +80,6 @@ const Layout = ({ children, projectName = "PrediChain Project", projectStatus = 
 
   return (
     <div className="flex h-screen bg-gray-900 text-gray-200">
-
       {/* Sidebar */}
       <aside className={`bg-gray-900 border-r border-gray-800 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} flex flex-col`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
@@ -62,14 +90,9 @@ const Layout = ({ children, projectName = "PrediChain Project", projectStatus = 
             {sidebarOpen ? "«" : "»"}
           </button>
         </div>
-
         <nav className="flex-1 mt-4">
-          {sidebarLinks.map((link) => (
-            <a
-              key={link.name}
-              href="#"
-              className="flex items-center gap-3 p-3 mx-2 my-1 rounded-lg hover:bg-gray-800 transition"
-            >
+          {sidebarLinks.map(link => (
+            <a key={link.name} href="#" className="flex items-center gap-3 p-3 mx-2 my-1 rounded-lg hover:bg-gray-800 transition">
               <span className="text-lg">{link.icon}</span>
               {sidebarOpen && <span>{link.name}</span>}
             </a>
@@ -79,19 +102,19 @@ const Layout = ({ children, projectName = "PrediChain Project", projectStatus = 
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-
         {/* Topbar */}
         <header className="flex justify-between items-center bg-gray-800/70 backdrop-blur-md border-b border-gray-700 px-6 py-3 shadow-lg">
-          
           {/* Project Info */}
           <div>
             <p className="text-gray-300 text-sm">Current Project:</p>
-            <h2 className="font-bold text-white text-lg">{projectName} <span className="text-green-400 text-sm">({projectStatus})</span></h2>
+            <h2 className="font-bold text-white text-lg">
+              {currentProject?.name || "Loading Project..."} 
+              {currentProject?.status && <span className="text-green-400 text-sm"> ({currentProject.status})</span>}
+            </h2>
           </div>
 
           {/* User + Notifications */}
           <div className="flex items-center gap-4 relative">
-
             {/* Notifications */}
             <button className="relative text-gray-300 hover:text-white">
               <FaBell size={20} />
@@ -111,59 +134,33 @@ const Layout = ({ children, projectName = "PrediChain Project", projectStatus = 
                 <FaUserCircle size={28} className="text-gray-300" />
                 <span className="hidden sm:block text-gray-200 font-medium">{auth.currentUser?.displayName || "Z"}</span>
               </button>
-
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
-                  <button
-                    onClick={() => alert("Profile page not implemented yet")}
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-700"
-                  >
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => setShowLogoutModal(true)}
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-700"
-                  >
-                    Logout
-                  </button>
+                  <button onClick={() => alert("Profile page not implemented yet")} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Profile</button>
+                  <button onClick={() => setShowLogoutModal(true)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Logout</button>
                 </div>
               )}
             </div>
           </div>
-
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-6 overflow-auto">
-          {children}
-        </main>
-
+        <main className="flex-1 p-6 overflow-auto">{children}</main>
       </div>
 
-      {/* Logout Confirmation Modal */}
+      {/* Logout Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 w-80 text-center">
             <h2 className="text-xl font-bold mb-4 text-white">Confirm Logout?</h2>
             <p className="text-gray-300 mb-6">Are you sure you want to log out?</p>
             <div className="flex justify-around">
-              <button
-                onClick={handleLogout}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition"
-              >
-                Logout
-              </button>
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition"
-              >
-                Cancel
-              </button>
+              <button onClick={handleLogout} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition">Logout</button>
+              <button onClick={() => setShowLogoutModal(false)} className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">Cancel</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

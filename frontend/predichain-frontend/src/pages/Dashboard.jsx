@@ -12,8 +12,10 @@ const Dashboard = ({ projectId }) => {
   const [loading, setLoading] = useState(true);
   const [projectInfo, setProjectInfo] = useState(null);
   const [forecastData, setForecastData] = useState([]);
+  const [recommendationsData, setRecommendationsData] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
 
+  // 1️⃣ Fetch project info from Firebase
   useEffect(() => {
     const fetchProjectData = async () => {
       try {
@@ -37,6 +39,38 @@ const Dashboard = ({ projectId }) => {
 
     fetchProjectData();
   }, [projectId]);
+
+  // 2️⃣ Fetch forecast + recommendations from backend
+  useEffect(() => {
+    const fetchForecastAndRecommendations = async () => {
+      if (!projectInfo) return;
+
+      try {
+        // Assume projectInfo.materials = ["Cement", "Steel Rebar", "Gravel"]
+        const allForecasts = [];
+        const allRecommendations = [];
+
+        for (let material of projectInfo.materials || []) {
+          const formData = new FormData();
+          formData.append('filename', projectInfo.uploadedCsvFileName); // CSV uploaded earlier
+          formData.append('material', material);
+          formData.append('lead_time_days', projectInfo.lead_time_days || 10);
+          formData.append('current_inventory', projectInfo.inventory?.find(i => i.material === material)?.quantity || 0);
+
+          const res = await axios.post('http://127.0.0.1:8000/recommendation', formData);
+          allForecasts.push(...res.data.forecast);
+          allRecommendations.push(...res.data.recommendations);
+        }
+
+        setForecastData(allForecasts);
+        setRecommendationsData(allRecommendations);
+      } catch (err) {
+        console.error("Error fetching forecast/recommendations:", err);
+      }
+    };
+
+    fetchForecastAndRecommendations();
+  }, [projectInfo]);
 
   if (loading) return <Layout><p className="text-white">Loading dashboard...</p></Layout>;
   if (!projectInfo) return <Layout><p className="text-white">No project data found</p></Layout>;
@@ -62,11 +96,11 @@ const Dashboard = ({ projectId }) => {
       {/* --- Forecast Section --- */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <MaterialForecastChart projectData={projectInfo} />
-          <HistoricalVsForecastChart projectData={projectInfo} />
+          <MaterialForecastChart forecastData={forecastData} />
+          <HistoricalVsForecastChart forecastData={forecastData} />
         </div>
         <div>
-          <RecommendationPanel projectData={projectInfo} />
+          <RecommendationPanel recommendationsData={recommendationsData} />
         </div>
       </div>
     </Layout>

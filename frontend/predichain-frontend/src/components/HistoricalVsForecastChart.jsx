@@ -15,12 +15,12 @@ const HistoricalVsForecastChart = ({ projectData }) => {
         formData.append("material", projectData.material);
         formData.append("horizon_months", projectData.horizon_months);
 
-        const res = await axios.post("http://127.0.0.1:8000/recommendation", formData);
-        const forecast = res.data.forecast;
+        const res = await axios.post("http://127.0.0.1:8000/forecast", formData);
+        const forecast = res.data; // array of { forecast_date, yhat, material }
 
         setData({
           timeline: forecast.map(f => new Date(f.forecast_date).toLocaleString('default', { month: 'short', year: 'numeric' })),
-          historical: forecast.map(f => f.yhat * 0.8), // simple historical proxy
+          historical: forecast.map(f => f.yhat * 0.8), // you can adjust if you have real historical data
           forecast: forecast.map(f => f.yhat)
         });
       } catch (err) {
@@ -36,8 +36,22 @@ const HistoricalVsForecastChart = ({ projectData }) => {
   const chartData = {
     labels: data.timeline,
     datasets: [
-      { label: "Historical Usage", data: data.historical, yAxisID: "y1", borderColor: "rgba(255, 99, 132, 0.7)", backgroundColor: "rgba(255, 99, 132, 0.2)", tension: 0.4 },
-      { label: "Forecasted Usage", data: data.forecast, yAxisID: "y2", borderColor: "rgba(54, 162, 235, 0.7)", backgroundColor: "rgba(54, 162, 235, 0.2)", tension: 0.4 }
+      {
+        label: "Historical Usage",
+        data: data.historical,
+        yAxisID: "y1",
+        borderColor: "rgba(255, 99, 132, 0.7)",
+        backgroundColor: "rgba(255, 99, 132, 0.2)",
+        tension: 0.4
+      },
+      {
+        label: "Forecasted Usage",
+        data: data.forecast,
+        yAxisID: "y2",
+        borderColor: "rgba(54, 162, 235, 0.7)",
+        backgroundColor: "rgba(54, 162, 235, 0.2)",
+        tension: 0.4
+      }
     ]
   };
 

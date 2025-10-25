@@ -13,24 +13,22 @@ const MaterialForecastChart = ({ projectData }) => {
         const formData = new FormData();
         formData.append("filename", projectData.csvFilename);
         formData.append("material", projectData.material);
-        formData.append("horizon_months", projectData.horizon_months);
+        formData.append("horizon_months", projectData.horizon_months || 6);
 
         const res = await axios.post("http://127.0.0.1:8000/forecast", formData);
-        const forecast = res.data; // array of {forecast_date, yhat, material}
+        const forecast = res.data;
 
         const labels = forecast.map(f => new Date(f.forecast_date).toLocaleString('default', { month: 'short', year: 'numeric' }));
-        const dataset = [
-          {
-            label: forecast[0]?.material || "Material",
-            data: forecast.map(f => f.yhat),
-            borderColor: "#4f46e5",
-            backgroundColor: "#4f46e588",
-            fill: false,
-            tension: 0.4,
-          }
-        ];
+        const datasets = [{
+          label: forecast[0]?.material || "Material",
+          data: forecast.map(f => f.forecasted_demand),
+          borderColor: "#4f46e5",
+          backgroundColor: "#4f46e588",
+          fill: false,
+          tension: 0.4,
+        }];
 
-        setForecastData({ labels, datasets: dataset });
+        setForecastData({ labels, datasets });
       } catch (err) {
         console.error("Error fetching forecast:", err);
       }

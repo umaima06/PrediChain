@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { FaExclamationCircle, FaTruck, FaShoppingCart } from "react-icons/fa";
-
-const iconsMap = {
-  "Order Now": <FaShoppingCart />,
-  "Low Inventory": <FaExclamationCircle />,
-  "Supplier Issues": <FaTruck />,
-};
 
 const RecommendationPanel = ({ projectData }) => {
   const [recs, setRecs] = useState([]);
@@ -20,20 +13,23 @@ const RecommendationPanel = ({ projectData }) => {
         formData.append("filename", projectData.csvFilename);
         formData.append("material", projectData.material);
         formData.append("horizon_months", projectData.horizon_months);
-        formData.append("lead_time_days", projectData.lead_time_days);
-        formData.append("current_inventory", projectData.current_inventory);
-        formData.append("supplierReliability", projectData.supplierReliability);
-        formData.append("deliveryTimeDays", projectData.deliveryTimeDays);
-        formData.append("contractorTeamSize", projectData.contractorTeamSize);
-        formData.append("projectBudget", projectData.projectBudget);
-        formData.append("weather", projectData.weather);
-        formData.append("region_risk", projectData.region_risk);
-        formData.append("notes", projectData.notes);
-        formData.append("projectName", projectData.projectName);
+        formData.append("lead_time_days", projectData.lead_time_days || 10);
+        formData.append("current_inventory", projectData.current_inventory || 0);
+        formData.append("supplierReliability", projectData.supplierReliability || 100);
+        formData.append("deliveryTimeDays", projectData.deliveryTimeDays || 0);
+        formData.append("contractorTeamSize", projectData.contractorTeamSize || 0);
+        formData.append("projectBudget", projectData.projectBudget || 0);
+        formData.append("weather", projectData.weather || "");
+        formData.append("region_risk", projectData.region_risk || "");
+        formData.append("notes", projectData.notes || "");
+        formData.append("projectName", projectData.projectName || "");
+        formData.append("projectType", projectData.projectType || "");
+        formData.append("location", projectData.location || "");
+        formData.append("startDate", projectData.startDate || "");
+        formData.append("endDate", projectData.endDate || "");
 
         const res = await axios.post("http://127.0.0.1:8000/recommendation", formData);
-        const recommendations = res.data.recommendations;
-        setRecs(recommendations);
+        setRecs(res.data.recommendations);
       } catch (err) {
         console.error("Error fetching recommendations:", err);
       }
@@ -42,19 +38,19 @@ const RecommendationPanel = ({ projectData }) => {
     fetchRecs();
   }, [projectData]);
 
+  if (!recs.length) return <p className="text-white">Loading recommendations...</p>;
+
   return (
     <div className="bg-gradient-to-r from-green-500 to-teal-600 p-4 rounded-xl shadow-lg text-white">
-      <h3 className="text-lg font-bold mb-2">Recommendations</h3>
-      {recs.length === 0 && <p>Loading recommendations...</p>}
-      {recs.map((r, i) => (
-        <div key={i} className="flex items-center gap-3 p-2 mb-2 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition">
-          <div className="text-xl">{iconsMap[r.type]}</div>
-          <div>
-            <p className="font-medium">{r.message}</p>
-            <p className="text-xs text-gray-200">{r.details}</p>
-          </div>
-        </div>
-      ))}
+      <h3 className="text-lg font-bold mb-2">Procurement Recommendations</h3>
+      <ul>
+        {recs.map((r, idx) => (
+          <li key={idx} className="mb-2 p-2 bg-white/10 rounded">
+            <p>{r.material}: Order <b>{r.recommended_order_quantity}</b> units by <b>{new Date(r.recommended_order_date).toLocaleDateString()}</b></p>
+            <p className="text-sm text-gray-200">Forecasted demand: {r.forecasted_demand}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
