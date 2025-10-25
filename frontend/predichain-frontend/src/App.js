@@ -6,6 +6,7 @@ import ProjectManagement from './pages/ProjectManagement';
 import CSVUpload from './pages/CSVUpload';
 import './index.css';
 import './components/LiquidEther.css'
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/login" element={<Auth />} /> {/* Login/Signup page */}
         <Route path="/projects" element={<ProjectManagement />} />
         <Route path="/csv/:projId" element={<CSVUpload />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </Router>
   );
