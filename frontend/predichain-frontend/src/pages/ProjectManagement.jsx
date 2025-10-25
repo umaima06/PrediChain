@@ -5,6 +5,8 @@ import { db, auth } from "../firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
 import Navbar from '../components/Navbar';
+import FeatureCard from '../components/FeatureCard';
+import BenefitCard from '../components/BenefitCard';
 import Footer from '../components/Footer';
 import LiquidEther from '../components/LiquidEther';
 

@@ -25,9 +25,19 @@ const Navbar = () => {
       </h1>
 
       <div className="flex gap-6 items-center text-sm font-medium">
-        <a href="#home" className="hover:text-[#B19EEF] transition">Home</a>
+        <a href="/" className="hover:text-[#B19EEF] transition">Home</a>
         <a href="#features" className="hover:text-[#B19EEF] transition">Features</a>
         <a href="#benefits" className="hover:text-[#B19EEF] transition">Benefits</a>
+        
+      {/* Show 'My Projects' link only if logged in */}
+      {user && (
+        <Link
+          to="/projects"
+          className="hover:text-[#B19EEF] transition"
+        >
+          My Projects
+        </Link>
+      )}
 
         {user ? (
           <div className="relative">
