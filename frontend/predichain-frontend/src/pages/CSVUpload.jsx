@@ -54,13 +54,28 @@ const CSVUpload = () => {
       const rows = text.split('\n').filter(Boolean);
       if (rows.length < 1) return;
 
-      const headerCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-      const requiredCols = ['date', 'material', 'quantity_used'];
-      const missingCols = requiredCols.filter(c => !headerCols.includes(c));
-      if (missingCols.length > 0) {
-        alert(`CSV missing required columns: ${missingCols.join(', ')}`);
-        return;
-      }
+      // const headerCols = rows[0].split(',').map(h => h.trim().toLowerCase());
+      // const requiredCols = ['date_of_materail_usage', 'material_name', 'quantity_used'];
+      // const missingCols = requiredCols.filter(c => !headerCols.includes(c));
+      const requiredCols = [
+        'Date_of_Materail_Usage', 
+        'Material_Name', 
+        'Quantity_Used'
+      ];
+      
+      // Convert CSV header to lowercase and trim for robust comparison
+      const lowerHeaderCols = rows[0].split(',').map(h => h.trim().toLowerCase());
+      const lowerRequiredCols = requiredCols.map(c => c.toLowerCase());
+    
+      // Check if the lowercase required columns are present
+      const missingCols = lowerRequiredCols.filter(c => !lowerHeaderCols.includes(c));
+        if (missingCols.length > 0) {
+          const missingPascalCase = missingCols.map(
+            missingLower => requiredCols.find(rc => rc.toLowerCase() === missingLower)
+          );
+          alert(`CSV missing required columns: ${missingCols.join(', ')}`);
+          return;
+        }
 
       // Show first 5 rows as preview
       setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
@@ -107,6 +122,11 @@ const CSVUpload = () => {
       forecastData.append("weather", formData.weather);
       forecastData.append("region_risk", formData.region_risk);
       forecastData.append("notes", formData.notes);
+      forecastData.append("projectName", formData.projectName);
+      forecastData.append("projectType", formData.projectType);
+      forecastData.append("location", formData.location);
+      forecastData.append("startDate", formData.startDate);
+      forecastData.append("endDate", formData.endDate);
 
       const res = await axios.post('http://127.0.0.1:8000/recommendation', forecastData);
       console.log("Forecast result:", res.data);

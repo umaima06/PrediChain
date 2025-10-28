@@ -248,25 +248,29 @@ async def upload_data(file: UploadFile = File(...)):
     Validates required columns present in CSV before saving.
     Returns filename to the frontend.
     """
+    UPLOAD_DIR = "data/uploads"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    filepath = os.path.join(UPLOAD_DIR, file.filename)
     contents = await file.read()
-    # Attempt to read CSV into pandas to validate columns (raises if bad)
-    try:
-        df = pd.read_csv(pd.io.common.BytesIO(contents))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {e}")
-
+    df = pd.read_csv(pd.io.common.BytesIO(contents), encoding='latin-1', sep=',', engine='python')
     df.columns = [c.strip() for c in df.columns]
+    
+    # required_cols = [
+    #     "Project_ID", "Project_Name", "Project_Type", "Project_Size", "Location",
+    #     "Start_Date", "End_Date", "Budget_Planned_Quantity", "Material_Name",
+    #     "Quantity_Used", "Planned_Quantity", "Unit", "Supplier_Name",
+    #     "Supllier_Reliability_Score", "Average_Delivery_Time_Days", "Delivery_Delays",
+    #     "Contractor_Team_Size", "Number_of_Shifts_Work_Hours", "Weather_Condition",
+    #     "Regional_Risk_Level", "Notes_Special_Conditions", "Project_Phase",
+    #     "Date_of_Materail_Usage"
+    # ]
 
     required_cols = [
-        "Project_ID", "Project_Name", "Project_Type", "Project_Size", "Location",
-        "Start_Date", "End_Date", "Budget_Planned_Quantity", "Material_Name",
-        "Quantity_Used", "Planned_Quantity", "Unit", "Supplier_Name",
-        "Supllier_Reliability_Score", "Average_Delivery_Time_Days", "Delivery_Delays",
-        "Contractor_Team_Size", "Number_of_Shifts_Work_Hours", "Weather_Condition",
-        "Regional_Risk_Level", "Notes_Special_Conditions", "Project_Phase",
-        "Date_of_Materail_Usage"
-    ]
-
+        'Date_of_Materail_Usage', 
+        'Material_Name', 
+        'Quantity_Used'
+      ]
+      
     missing_cols = [c for c in required_cols if c not in df.columns]
     if missing_cols:
         raise HTTPException(status_code=400, detail=f"CSV missing columns: {missing_cols}")
@@ -274,7 +278,7 @@ async def upload_data(file: UploadFile = File(...)):
     filepath = os.path.join(UPLOAD_DIR, file.filename)
     with open(filepath, "wb") as f:
         f.write(contents)
-    return {"message": "File uploaded successfully", "filename": file.filename}
+    return {"filename": file.filename, "message": "Upload successful"}
 
 # --- Forecast (historical CSV -> Prophet monthly forecast) ---
 @app.post("/forecast")
