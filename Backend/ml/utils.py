@@ -7,75 +7,70 @@ from typing import List
 def clean_and_validate_data(df: pd.DataFrame, required_cols: List[str]) -> pd.DataFrame:
     """
     Cleans, validates, and prepares the input DataFrame for ML forecasting.
-    This function performs column checks, type conversions, handles anomalies, 
+    This function performs column checks, type conversions, handles anomalies,
     and aggregates daily material usage.
-    
+
     Args:
         df: The raw input DataFrame from the uploaded CSV.
-        required_cols: A list of mandatory columns (e.g., ['date', 'material', 'quantity_used', 'rainfall_mm']).
-    
+        required_cols: A list of mandatory columns (e.g., ['Date_of_Materail_Usage', 'Material_Name', 'Quantity_Used']).
+
     Returns:
         A cleaned, validated, and aggregated DataFrame ready for Prophet.
-    
+
     Raises:
         ValueError: If essential columns are missing or date conversion fails.
     """
-    
-    # CRITICAL FIX 1: Strip all column names to remove any hidden whitespace or BOM characters.
+
+    # Strip hidden whitespaces/BOMs
     df.columns = df.columns.str.strip()
 
-    # 1. Check for required columns
+    # ✅ Detect the correct date column
+    possible_date_cols = ['Date_of_Materail_Usage', 'Date_of_Material_Usage', 'date']
+    date_col = next((col for col in possible_date_cols if col in df.columns), None)
+
+    if not date_col:
+        raise ValueError("No valid date column found. Expected one of: 'Date_of_Materail_Usage', 'Date_of_Material_Usage', or 'date'.")
+
+    # 1️⃣ Check for required columns
     if not set(required_cols).issubset(df.columns):
         missing = set(required_cols) - set(df.columns)
-        # Check if 'date' is still missing after stripping (e.g., due to file corruption)
-        if 'date' not in df.columns:
-             raise ValueError("The 'date' column must be present and named exactly 'date'.")
         raise ValueError(f"Missing required columns: {missing}. Must include: {required_cols}")
 
-    # 2. Convert date column (ds)
+    # 2️⃣ Convert date column
     try:
-        # CRITICAL FIX 2: Use errors='coerce' to turn any unparseable dates into NaT (Not a Time), 
-        # allowing the script to continue without raising a fatal conversion error.
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
     except Exception:
-        # This catches residual errors if the column cannot be accessed.
-        raise ValueError("The 'date' column must be present and in a recognizable date format.")
+        raise ValueError(f"The '{date_col}' column must be in a recognizable date format.")
 
-    # Drop any rows where the date conversion failed (now represented as NaT)
-    df.dropna(subset=['date'], inplace=True)
-    
-    # 3. Clean and validate 'quantity_used' (y) and 'rainfall_mm' (exogenous variable)
-    
-    # Ensure quantity_used is numeric, coercing errors to NaN
-    df['quantity_used'] = pd.to_numeric(df['quantity_used'], errors='coerce')
-    
-    # Handle negative or zero usage/quantity, which might be errors in project logs
-    df.dropna(subset=['quantity_used'], inplace=True)
-    df = df[df['quantity_used'] >= 0]
-    
-    # Ensure rainfall_mm is numeric (important for the regressor)
-    df['rainfall_mm'] = pd.to_numeric(df['rainfall_mm'], errors='coerce')
-    # Fill any missing rainfall data with 0
-    df['rainfall_mm'].fillna(0, inplace=True) 
+    df.dropna(subset=[date_col], inplace=True)
 
-    # 4. Aggregate data to a daily frequency
-    
-    # Set 'date' as index for easier grouping
-    df = df.set_index('date')
-    
-    # Group by material and resample to daily frequency ('D')
-    aggregated_df = df.groupby(['material', pd.Grouper(freq='D')]).agg({
-        'quantity_used': 'sum',
-        'rainfall_mm': 'mean' 
+    # 3️⃣ Clean Quantity_Used
+    df['Quantity_Used'] = pd.to_numeric(df['Quantity_Used'], errors='coerce')
+    df.dropna(subset=['Quantity_Used'], inplace=True)
+    df = df[df['Quantity_Used'] >= 0]
+
+    # 4️⃣ Handle rainfall_mm (optional)
+    if 'rainfall_mm' not in df.columns:
+        df['rainfall_mm'] = 0
+    else:
+        df['rainfall_mm'] = pd.to_numeric(df['rainfall_mm'], errors='coerce').fillna(0)
+
+    # Normalize Material_Name so casing/spaces never break matching
+    if "Material_Name" in df.columns:
+        df["Material_Name"] = df["Material_Name"].astype(str).str.strip().str.lower()
+
+    # 5️⃣ Aggregate to daily data
+    df = df.set_index(date_col)
+    aggregated_df = df.groupby(['Material_Name', pd.Grouper(freq='D')]).agg({
+        'Quantity_Used': 'sum',
+        'rainfall_mm': 'mean'
     }).reset_index()
 
-    # Rename column back to 'date'
-    aggregated_df.rename(columns={'date': 'date'}, inplace=True)
-    
-    # Backfill missing usage after aggregation with 0
-    aggregated_df['quantity_used'].fillna(0, inplace=True)
-    
-    # Forward-fill the rainfall_mm 
+    # Fill NaNs
+    aggregated_df['Quantity_Used'].fillna(0, inplace=True)
     aggregated_df['rainfall_mm'].fillna(method='ffill', inplace=True)
-    
+
+    # Rename date col back for Prophet usage
+    aggregated_df.rename(columns={date_col: 'date'}, inplace=True)
+
     return aggregated_df

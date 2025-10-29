@@ -1,0 +1,3 @@
+Project_ID,Project_Name,Project_Type,Project_Size,Location,Start_Date,End_Date,Budget_Planned_Quantity,Material_Name,Quantity_Used,Planned_Quantity,Unit,Supplier_Name,Supplier_Reliability_Score,Average_Delivery_Time_Days,Delivery_Delays,Contractor_Team_Size,Number_of_Shifts_Work_Hours,Weather_Condition,Regional_Risk_Level,Notes_Special_Conditions,Project_Phase,Date_of_Materail_Usage
+UbPycE2PrXb3R4xS9txy,oldie building,building,500 sq feet ,hyderabad,01-02-2024,03-04-2025,600000,bricks,6000,5000,89,bajaj,50,10,5,10,40,risky,high,,beginning,05-06-2024
+UbPycE2PrXb3R4xS9txy,oldie building,building,500 sq feet ,hyderabad,01-02-2024,03-04-2025,600000,bricks,6000,5000,89,bajaj,50,10,5,10,40,risky,high,,beginning,08-09-2025

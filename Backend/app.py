@@ -303,7 +303,6 @@ def forecast(
         return forecast_df.to_dict(orient="records")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 # --- Recommendation (current project inputs + forecast) ---
 @app.post("/recommendation")
 def recommend_procurement(
@@ -339,6 +338,12 @@ def recommend_procurement(
     df_hist = pd.read_csv(filepath)
     df_hist.columns = [c.strip() for c in df_hist.columns]
 
+    print("=== Debug: /recommendation called ===")
+    print("Filename:", filename)
+    print("Material:", material)
+    print("File exists:", os.path.exists(filepath))
+    print("Columns in CSV:", df_hist.columns.tolist())
+
     try:
         # Forecast using historical CSV
         forecast_df = generate_forecast(df_hist, material, horizon_months)
@@ -365,9 +370,10 @@ def recommend_procurement(
         })
 
         recommendation_df = generate_procurement_recommendations(
-            forecast_df=current_project_data,
-            lead_time_days=lead_time_days,
-            current_inventory=current_inventory
+           forecast_df=forecast_df,
+           current_project_data=current_project_data,   # ✅ include this
+           lead_time_days=lead_time_days,
+           current_inventory=current_inventory
         )
 
         return {
@@ -376,6 +382,9 @@ def recommend_procurement(
         }
 
     except Exception as e:
+        import traceback
+        print("🔥🔥 ERROR IN /recommendATION 🔥🔥")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Historical + Forecast combined endpoint ---

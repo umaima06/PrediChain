@@ -16,7 +16,7 @@ function App() {
         <Route path="/login" element={<Auth />} /> {/* Login/Signup page */}
         <Route path="/projects" element={<ProjectManagement />} />
         <Route path="/csv/:projId" element={<CSVUpload />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/:projId" element={<Dashboard />} />
       </Routes>
     </Router>
   );

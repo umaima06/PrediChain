@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -38,68 +38,117 @@ const CSVUpload = () => {
     notes: ''
   });
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+// ✅ Restore previously uploaded filename if available
+useEffect(() => {
+  const savedFilename = localStorage.getItem("uploadedFilename");
+  const savedFileName = localStorage.getItem("uploadedFileName");
+
+  if (savedFilename) setFilename(savedFilename);
+  if (savedFileName) setUploadedFile({ name: savedFileName });
+}, []);
+
+// ✅ File upload handler
+const handleFileUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // ✅ Preview logic
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const text = event.target.result;
+    const rows = text.split('\n').filter(Boolean);
+    setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
+    localStorage.setItem("csvPreview", JSON.stringify(rows.slice(0, 6).map(r => r.split(','))));
   };
+  reader.readAsText(file);
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // ✅ Upload logic
+  const data = new FormData();
+  data.append("file", file);
 
-    // Validate CSV columns
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target.result;
-      const rows = text.split('\n').filter(Boolean);
-      if (rows.length < 1) return;
+  try {
+    setLoading(true);
+    const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
 
-      // const headerCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-      // const requiredCols = ['date_of_materail_usage', 'material_name', 'quantity_used'];
-      // const missingCols = requiredCols.filter(c => !headerCols.includes(c));
-      const requiredCols = [
-        'Date_of_Materail_Usage', 
-        'Material_Name', 
-        'Quantity_Used'
-      ];
+    setUploadedFile(file);
+    setFilename(res.data.filename);
+
+    // ✅ Save to localStorage
+    localStorage.setItem("uploadedFilename", res.data.filename);
+    localStorage.setItem("uploadedFileName", file.name);
+  } catch (err) {
+    console.error("File upload failed:", err);
+    alert("Upload failed, try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  const savedPreview = localStorage.getItem("csvPreview");
+  if (savedPreview) {
+    setCsvPreview(JSON.parse(savedPreview));
+  }
+}, []);
+
+//     // Validate CSV columns
+//     const reader = new FileReader();
+//     reader.onload = (event) => {
+//       const text = event.target.result;
+//       const rows = text.split('\n').filter(Boolean);
+//       if (rows.length < 1) return;
+
+//       // const headerCols = rows[0].split(',').map(h => h.trim().toLowerCase());
+//       // const requiredCols = ['date_of_materail_usage', 'material_name', 'quantity_used'];
+//       // const missingCols = requiredCols.filter(c => !headerCols.includes(c));
+//       const requiredCols = [
+//         'Date_of_Materail_Usage', 
+//         'Material_Name', 
+//         'Quantity_Used'
+//       ];
       
-      // Convert CSV header to lowercase and trim for robust comparison
-      const lowerHeaderCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-      const lowerRequiredCols = requiredCols.map(c => c.toLowerCase());
+//       // Convert CSV header to lowercase and trim for robust comparison
+//       const lowerHeaderCols = rows[0].split(',').map(h => h.trim().toLowerCase());
+//       const lowerRequiredCols = requiredCols.map(c => c.toLowerCase());
     
-      // Check if the lowercase required columns are present
-      const missingCols = lowerRequiredCols.filter(c => !lowerHeaderCols.includes(c));
-        if (missingCols.length > 0) {
-          const missingPascalCase = missingCols.map(
-            missingLower => requiredCols.find(rc => rc.toLowerCase() === missingLower)
-          );
-          alert(`CSV missing required columns: ${missingCols.join(', ')}`);
-          return;
-        }
+//       // Check if the lowercase required columns are present
+//       const missingCols = lowerRequiredCols.filter(c => !lowerHeaderCols.includes(c));
+//         if (missingCols.length > 0) {
+//           const missingPascalCase = missingCols.map(
+//             missingLower => requiredCols.find(rc => rc.toLowerCase() === missingLower)
+//           );
+//           alert(`CSV missing required columns: ${missingCols.join(', ')}`);
+//           return;
+//         }
 
-      // Show first 5 rows as preview
-      setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
-    };
-    reader.readAsText(file);
+//       // Show first 5 rows as preview
+//       setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
+//     };
+//     reader.readAsText(file);
 
-    // Upload to backend
-    const data = new FormData();
-    data.append("file", file);
+//     // Upload to backend
+//     const data = new FormData();
+//     data.append("file", file);
 
-    try {
-      setLoading(true);
-      const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setUploadedFile(file);
-      setFilename(res.data.filename);
-    } catch (err) {
-      console.error("File upload failed:", err);
-      alert("Upload failed, try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+//     try {
+//       setLoading(true);
+//       const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
+//         headers: { 'Content-Type': 'multipart/form-data' }
+//       });
+//    setUploadedFile(file);
+// setFilename(res.data.filename);
+
+// // 🧠 persist uploaded filename in localStorage
+// localStorage.setItem("uploadedFilename", res.data.filename);
+//     } catch (err) {
+//       console.error("File upload failed:", err);
+//       alert("Upload failed, try again.");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 
   const handleGenerateForecast = async () => {
     if (!filename || !formData.material) {
@@ -132,6 +181,7 @@ const CSVUpload = () => {
       console.log("Forecast result:", res.data);
 
       navigate(`/dashboard/${projId}`, { state: { forecast: res.data } });
+      localStorage.removeItem("uploadedFilename");
     } catch (err) {
       console.error("Forecast generation failed:", err);
       alert("Forecast failed, check console for details.");
@@ -164,7 +214,13 @@ const CSVUpload = () => {
     link.click();
     document.body.removeChild(link);
   };
-
+const handleInputChange = (e) => {
+  const { name, value } = e.target;
+  setFormData((prev) => ({
+    ...prev,
+    [name]: value,
+  }));
+};
   return (
     <div className="relative w-full min-h-screen overflow-hidden text-gray-200">
       <LiquidEther
@@ -225,6 +281,7 @@ const CSVUpload = () => {
           )}
 
          {/* Step 2: Upload Historical Data */}
+         
 {step === 2 && (
   <div>
     <h2 className="text-2xl font-semibold mb-4">Upload Historical Material Data</h2>
@@ -237,13 +294,35 @@ const CSVUpload = () => {
     >
       <FaDownload /> Download Excel Template
     </button>
+   {!uploadedFile && !filename ? (
+  <>
     <input
       type="file"
       accept=".csv"
       onChange={handleFileUpload}
       className="block w-full text-sm text-gray-300 bg-gray-800/60 border border-gray-600 rounded-lg cursor-pointer focus:ring-2 focus:ring-[#5C3AFF]"
     />
-    {uploadedFile && <p className="mt-3 text-green-400">✅ Uploaded: {uploadedFile.name}</p>}
+    <p className="mt-3 text-yellow-400">⚠️ No file uploaded yet.</p>
+  </>
+) : (
+  <div className="flex items-center justify-between mt-3 bg-gray-800/50 p-3 rounded-lg">
+    <p className="text-green-400">
+      ✅ File uploaded: <span className="font-semibold">{uploadedFile ? uploadedFile.name : filename}</span>
+    </p>
+    <button
+      onClick={() => {
+        setUploadedFile(null);
+        setFilename('');
+        localStorage.removeItem("uploadedFilename");
+        localStorage.removeItem("uploadedFileName");
+        localStorage.removeItem("csvPreview");
+      }}
+      className="text-red-400 hover:text-red-500"
+    >
+      Remove
+    </button>
+  </div>
+)}
     {csvPreview.length > 0 && (
       <div className="mt-4 text-gray-200">
         <p className="mb-2 font-semibold">Preview (first 5 rows):</p>
@@ -438,7 +517,7 @@ const CSVUpload = () => {
                     <p><b>Contractor Team:</b> {formData.contractorTeamSize} | <b>Budget:</b> ${formData.projectBudget}</p>
                     <p><b>Weather:</b> {formData.weather} | <b>Region Risk:</b> {formData.region_risk}</p>
                     <p><b>Notes:</b> {formData.notes}</p>
-                    {uploadedFile && <p><b>CSV:</b> {uploadedFile.name}</p>}
+                  <p><b>CSV File:</b> {uploadedFile ? uploadedFile.name : filename ? filename : "No file uploaded"}</p>
                   </div>
 
                   <button
