@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import { doc, setDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import LiquidEther from '../components/LiquidEther';
@@ -13,6 +15,14 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 const CSVUpload = () => {
   const { projId } = useParams();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (projId) {
+      localStorage.setItem("currentProjectId", projId);
+      console.log("✅ Project ID stored:", projId);
+    }
+  }, [projId]);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -38,153 +48,97 @@ const CSVUpload = () => {
     notes: ''
   });
 
-// ✅ Restore previously uploaded filename if available
-useEffect(() => {
-  const savedFilename = localStorage.getItem("uploadedFilename");
-  const savedFileName = localStorage.getItem("uploadedFileName");
+  const saveProjectDetails = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  if (savedFilename) setFilename(savedFilename);
-  if (savedFileName) setUploadedFile({ name: savedFileName });
-}, []);
+    const currentId = localStorage.getItem("currentProjectId");
+    if (!currentId) {
+      console.warn("❌ No currentProjectId in localStorage");
+      return;
+    }
 
-// ✅ File upload handler
-const handleFileUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+    const ref = doc(db, "users", user.uid, "projects", currentId);
+    await setDoc(ref, { ...formData, uploadedCsvFileName: filename || null }, { merge: true });
 
-  // ✅ Preview logic
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const text = event.target.result;
-    const rows = text.split('\n').filter(Boolean);
-    setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
-    localStorage.setItem("csvPreview", JSON.stringify(rows.slice(0, 6).map(r => r.split(','))));
+    console.log("✅ Project details saved to Firestore");
   };
-  reader.readAsText(file);
 
-  // ✅ Upload logic
-  const data = new FormData();
-  data.append("file", file);
+  useEffect(() => {
+    const savedFilename = localStorage.getItem("uploadedFilename");
+    const savedFileName = localStorage.getItem("uploadedFileName");
 
-  try {
-    setLoading(true);
-    const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    if (savedFilename) setFilename(savedFilename);
+    if (savedFileName) setUploadedFile({ name: savedFileName });
+  }, []);
 
-    setUploadedFile(file);
-    setFilename(res.data.filename);
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    // ✅ Save to localStorage
-    localStorage.setItem("uploadedFilename", res.data.filename);
-    localStorage.setItem("uploadedFileName", file.name);
-  } catch (err) {
-    console.error("File upload failed:", err);
-    alert("Upload failed, try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const rows = text.split('\n').filter(Boolean);
+      setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
+      localStorage.setItem("csvPreview", JSON.stringify(rows.slice(0, 6).map(r => r.split(','))));
+    };
+    reader.readAsText(file);
 
-useEffect(() => {
-  const savedPreview = localStorage.getItem("csvPreview");
-  if (savedPreview) {
-    setCsvPreview(JSON.parse(savedPreview));
-  }
-}, []);
+    const data = new FormData();
+    data.append("file", file);
 
-//     // Validate CSV columns
-//     const reader = new FileReader();
-//     reader.onload = (event) => {
-//       const text = event.target.result;
-//       const rows = text.split('\n').filter(Boolean);
-//       if (rows.length < 1) return;
+    try {
+      setLoading(true);
+      const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
 
-//       // const headerCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-//       // const requiredCols = ['date_of_materail_usage', 'material_name', 'quantity_used'];
-//       // const missingCols = requiredCols.filter(c => !headerCols.includes(c));
-//       const requiredCols = [
-//         'Date_of_Materail_Usage', 
-//         'Material_Name', 
-//         'Quantity_Used'
-//       ];
-      
-//       // Convert CSV header to lowercase and trim for robust comparison
-//       const lowerHeaderCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-//       const lowerRequiredCols = requiredCols.map(c => c.toLowerCase());
-    
-//       // Check if the lowercase required columns are present
-//       const missingCols = lowerRequiredCols.filter(c => !lowerHeaderCols.includes(c));
-//         if (missingCols.length > 0) {
-//           const missingPascalCase = missingCols.map(
-//             missingLower => requiredCols.find(rc => rc.toLowerCase() === missingLower)
-//           );
-//           alert(`CSV missing required columns: ${missingCols.join(', ')}`);
-//           return;
-//         }
+      setUploadedFile(file);
+      setFilename(res.data.filename);
 
-//       // Show first 5 rows as preview
-//       setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
-//     };
-//     reader.readAsText(file);
+      localStorage.setItem("uploadedFilename", res.data.filename);
+      localStorage.setItem("uploadedFileName", file.name);
+    } catch (err) {
+      console.error("❌ File upload failed:", err);
+      alert("Upload failed, try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-//     // Upload to backend
-//     const data = new FormData();
-//     data.append("file", file);
-
-//     try {
-//       setLoading(true);
-//       const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
-//         headers: { 'Content-Type': 'multipart/form-data' }
-//       });
-//    setUploadedFile(file);
-// setFilename(res.data.filename);
-
-// // 🧠 persist uploaded filename in localStorage
-// localStorage.setItem("uploadedFilename", res.data.filename);
-//     } catch (err) {
-//       console.error("File upload failed:", err);
-//       alert("Upload failed, try again.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+  useEffect(() => {
+    const savedPreview = localStorage.getItem("csvPreview");
+    if (savedPreview) setCsvPreview(JSON.parse(savedPreview));
+  }, []);
 
   const handleGenerateForecast = async () => {
+    const currentId = localStorage.getItem("currentProjectId");
+
     if (!filename || !formData.material) {
-      alert("Please upload CSV and select material first!");
+      alert("Upload CSV & select material first!");
       return;
     }
 
     try {
       setLoading(true);
       const forecastData = new FormData();
+      Object.entries(formData).forEach(([key, value]) =>
+        forecastData.append(key, value)
+      );
       forecastData.append("filename", filename);
-      forecastData.append("material", formData.material || formData.otherMaterial);
-      forecastData.append("horizon_months", formData.horizon_months);
-      forecastData.append("lead_time_days", formData.lead_time_days);
-      forecastData.append("current_inventory", formData.current_inventory);
-      forecastData.append("supplierReliability", formData.supplierReliability);
-      forecastData.append("deliveryTimeDays", formData.deliveryTimeDays);
-      forecastData.append("contractorTeamSize", formData.contractorTeamSize);
-      forecastData.append("projectBudget", formData.projectBudget);
-      forecastData.append("weather", formData.weather);
-      forecastData.append("region_risk", formData.region_risk);
-      forecastData.append("notes", formData.notes);
-      forecastData.append("projectName", formData.projectName);
-      forecastData.append("projectType", formData.projectType);
-      forecastData.append("location", formData.location);
-      forecastData.append("startDate", formData.startDate);
-      forecastData.append("endDate", formData.endDate);
+      forecastData.append("material", formData.material === "Other" ? formData.otherMaterial : formData.material);
 
       const res = await axios.post('http://127.0.0.1:8000/recommendation', forecastData);
-      console.log("Forecast result:", res.data);
+
+      console.log("✅ Forecast result:", res.data);
+      await saveProjectDetails();
 
       navigate(`/dashboard/${projId}`, { state: { forecast: res.data } });
       localStorage.removeItem("uploadedFilename");
     } catch (err) {
-      console.error("Forecast generation failed:", err);
-      alert("Forecast failed, check console for details.");
+      console.error("❌ Forecast failed:", err);
+      alert("Forecast failed!");
     } finally {
       setLoading(false);
     }

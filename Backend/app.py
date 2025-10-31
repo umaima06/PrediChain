@@ -496,9 +496,10 @@ def dashboard_data(
 
     try:
         rec_df = generate_procurement_recommendations(
-            forecast_df=current_project_data,
-            lead_time_days=lead_time_days,
-            current_inventory=current_inventory
+        forecast_df=forecast_df,         # use actual forecast
+        lead_time_days=lead_time_days,
+        current_inventory=current_inventory,
+        current_project_data=current_project_data  # pass project context
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recommendation generation failed: {e}")

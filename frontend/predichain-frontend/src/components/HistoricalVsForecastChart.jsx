@@ -1,74 +1,156 @@
-import React, { useEffect, useState } from "react";
-import { Line } from "react-chartjs-2";
+// src/components/HistoricalVsForecastChart.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
 
-const HistoricalVsForecastChart = ({ projectData }) => {
-  const [data, setData] = useState(null);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
+
+const HistoricalVsForecastChart = ({ projectData, forecastData, historicalData }) => {
+  const [payload, setPayload] = useState({
+    historical: historicalData || [],
+    forecast: forecastData || [],
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!projectData) return;
+    if (historicalData && forecastData) {
+      setPayload({ historical: historicalData, forecast: forecastData });
+      return;
+    }
+
+    if (!projectData) {
+      if (forecastData?.length) {
+        setPayload((p) => ({ ...p, forecast: forecastData }));
+      }
+      return;
+    }
+
+    let cancel = false;
 
     const fetchData = async () => {
+      const filename =
+        projectData.uploadedCsvFileName ||
+        projectData.csvFilename ||
+        projectData.filename;
+      const material = projectData.material;
+      const horizon = projectData.horizon_months || 6;
+
+      if (!filename || !material) return;
+
       try {
-        const formData = new FormData();
-        formData.append("filename", projectData.csvFilename);
-        formData.append("material", projectData.material);
-        formData.append("horizon_months", projectData.horizon_months);
+        setLoading(true);
+        const fd = new FormData();
+        fd.append("filename", filename);
+        fd.append("material", material);
+        fd.append("horizon_months", horizon);
 
-        const res = await axios.post("http://127.0.0.1:8000/forecast", formData);
-        const forecast = res.data; // array of { forecast_date, yhat, material }
+        const res = await axios.post("http://127.0.0.1:8000/historical_forecast", fd);
+        if (cancel) return;
 
-        setData({
-          timeline: forecast.map(f => new Date(f.forecast_date).toLocaleString('default', { month: 'short', year: 'numeric' })),
-          historical: forecast.map(f => f.yhat * 0.8), // you can adjust if you have real historical data
-          forecast: forecast.map(f => f.yhat)
+        setPayload({
+          historical: res.data?.historical ?? [],
+          forecast: res.data?.forecast ?? [],
         });
-      } catch (err) {
-        console.error("Error fetching historical vs forecast:", err);
+      } finally {
+        if (!cancel) setLoading(false);
       }
     };
 
     fetchData();
-  }, [projectData]);
+    return () => (cancel = true);
+  }, [projectData, forecastData, historicalData]);
 
-  if (!data) return <p className="text-gray-300">Loading comparison chart...</p>;
+  const series = useMemo(() => {
+    const hist = (payload.historical || []).map((h) => ({
+      date: new Date(h.date || h.ds || h.forecast_date),
+      value: Number(h.quantity ?? h.yhat ?? 0),
+    }));
+
+    const fc = (payload.forecast || []).map((f) => ({
+      date: new Date(f.forecast_date || f.ds),
+      value: Number(f.yhat ?? f.forecasted_demand ?? 0),
+    }));
+
+    const months = [...new Set([...hist, ...fc].map((i) =>
+      new Date(i.date.getFullYear(), i.date.getMonth(), 1).toISOString()
+    ))]
+      .map((m) => new Date(m))
+      .sort((a, b) => a - b);
+
+    return {
+      labels: months.map((m) =>
+        m.toLocaleString("default", { month: "short", year: "numeric" })
+      ),
+      histValues: months.map((m) => {
+        const key = new Date(m.getFullYear(), m.getMonth(), 1).toISOString();
+        return hist.filter((x) =>
+          new Date(x.date).toISOString().startsWith(key.slice(0, 7))
+        ).reduce((a, b) => a + b.value, 0);
+      }),
+      fcValues: months.map((m) => {
+        const key = new Date(m.getFullYear(), m.getMonth(), 1).toISOString();
+        return fc.filter((x) =>
+          new Date(x.date).toISOString().startsWith(key.slice(0, 7))
+        ).reduce((a, b) => a + b.value, 0);
+      }),
+    };
+  }, [payload]);
+
+  const labels = series?.labels ?? [];
+  const histData = series?.histValues ?? [];
+  const fcData = series?.fcValues ?? [];
+
+  // ✅ STOP ChartJS from rendering when data empty or undefined
+  if (loading || !Array.isArray(labels) || !Array.isArray(histData) || !Array.isArray(fcData)) {
+    return <div className="text-gray-300 p-4">Loading chart data... ⏳</div>;
+  }
+
+  if (labels.length === 0) {
+    return <div className="text-gray-300 p-4">No chart data available 🙃</div>;
+  }
 
   const chartData = {
-    labels: data.timeline,
+    labels,
     datasets: [
       {
         label: "Historical Usage",
-        data: data.historical,
-        yAxisID: "y1",
-        borderColor: "rgba(255, 99, 132, 0.7)",
-        backgroundColor: "rgba(255, 99, 132, 0.2)",
-        tension: 0.4
+        data: histData,
+        borderColor: "rgba(255,140,50)",
+        backgroundColor: "rgba(255,140,50,0.3)",
       },
       {
         label: "Forecasted Usage",
-        data: data.forecast,
-        yAxisID: "y2",
-        borderColor: "rgba(54, 162, 235, 0.7)",
-        backgroundColor: "rgba(54, 162, 235, 0.2)",
-        tension: 0.4
-      }
-    ]
-  };
-
-  const options = {
-    responsive: true,
-    plugins: { legend: { position: "top", labels: { color: "white" } } },
-    scales: {
-      x: { ticks: { color: "white" }, grid: { color: "#444" } },
-      y1: { type: "linear", position: "left", ticks: { color: "white" }, grid: { color: "#444" } },
-      y2: { type: "linear", position: "right", ticks: { color: "white" }, grid: { drawOnChartArea: false } },
-    },
+        data: fcData,
+        borderColor: "rgba(50,140,255)",
+        backgroundColor: "rgba(50,140,255,0.3)",
+      },
+    ],
   };
 
   return (
-    <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-4 rounded-xl shadow-lg text-white mt-4">
-      <h3 className="text-lg font-bold mb-2">Historical vs Forecast</h3>
-      <Line data={chartData} options={options} />
+    <div className="text-white p-4 bg-[#0b1220] rounded-lg">
+      <h3 className="text-xl mb-2">📊 Historical vs Forecast</h3>
+      <Line data={chartData} />
     </div>
   );
 };

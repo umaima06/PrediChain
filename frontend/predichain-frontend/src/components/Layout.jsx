@@ -17,20 +17,27 @@ const sidebarLinks = [
 
 const Layout = ({ children }) => {
   const { projId } = useParams();
-  const location = useLocation(); // to get CSV updated data
+  const location = useLocation(); 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
 
+  // ✅ get projectID from params or localStorage
+  const currentId = projId || localStorage.getItem("currentProjectId");
+
+  // ✅ get current logged in user
+  const user = auth.currentUser;
+  const uid = user?.uid;
+
   // Fetch notifications
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        if (!auth.currentUser) return;
+        if (!uid) return;
         const notifRef = collection(db, "notifications");
-        const q = query(notifRef, where("uid", "==", auth.currentUser.uid));
+        const q = query(notifRef, where("uid", "==", uid));
         const querySnapshot = await getDocs(q);
         const notifData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setNotifications(notifData);
@@ -39,17 +46,22 @@ const Layout = ({ children }) => {
       }
     };
     fetchNotifications();
-  }, []);
+  }, [uid]);
 
-  // Fetch project data from Firestore
+  // ✅ Fetch project from users/<uid>/projects/<projId>
   useEffect(() => {
-    if (!projId) return;
+    if (!uid || !projId) return;
 
     const fetchProject = async () => {
       try {
-        const docRef = doc(db, 'projects', projId);
+        const docRef = doc(db, "users", uid, "projects", projId);
+        console.log("📂 Firebase doc path:", `/users/${uid}/projects/${projId}`);
+        
         const docSnap = await getDoc(docRef);
+
+        console.log("📄 Firestore snapshot exists:", docSnap.exists());
         if (docSnap.exists()) {
+          console.log("📄 Project Data:", docSnap.data());
           setCurrentProject(docSnap.data());
         } else {
           console.warn("No such project in Firestore!");
@@ -60,9 +72,9 @@ const Layout = ({ children }) => {
     };
 
     fetchProject();
-  }, [projId]);
+  }, [uid, projId]);
 
-  // Update project if CSV page sends updated metadata
+  // Update project metadata after CSV upload
   useEffect(() => {
     if (location.state?.projectData) {
       setCurrentProject(prev => ({ ...prev, ...location.state.projectData }));
@@ -102,20 +114,17 @@ const Layout = ({ children }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Topbar */}
+        {/* Header */}
         <header className="flex justify-between items-center bg-gray-800/70 backdrop-blur-md border-b border-gray-700 px-6 py-3 shadow-lg">
-          {/* Project Info */}
           <div>
             <p className="text-gray-300 text-sm">Current Project:</p>
             <h2 className="font-bold text-white text-lg">
-              {currentProject?.name || "Loading Project..."} 
+              {currentProject?.name || "Loading Project..."}
               {currentProject?.status && <span className="text-green-400 text-sm"> ({currentProject.status})</span>}
             </h2>
           </div>
 
-          {/* User + Notifications */}
-          <div className="flex items-center gap-4 relative">
-            {/* Notifications */}
+          <div className="flex items-center gap-4">
             <button className="relative text-gray-300 hover:text-white">
               <FaBell size={20} />
               {notifications.length > 0 && (
@@ -125,7 +134,6 @@ const Layout = ({ children }) => {
               )}
             </button>
 
-            {/* User Avatar Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -136,7 +144,7 @@ const Layout = ({ children }) => {
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
-                  <button onClick={() => alert("Profile page not implemented yet")} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Profile</button>
+                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700">Profile</button>
                   <button onClick={() => setShowLogoutModal(true)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Logout</button>
                 </div>
               )}
@@ -144,16 +152,13 @@ const Layout = ({ children }) => {
           </div>
         </header>
 
-        {/* Main Content Area */}
         <main className="flex-1 p-6 overflow-auto">{children}</main>
       </div>
 
-      {/* Logout Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 w-80 text-center">
             <h2 className="text-xl font-bold mb-4 text-white">Confirm Logout?</h2>
-            <p className="text-gray-300 mb-6">Are you sure you want to log out?</p>
             <div className="flex justify-around">
               <button onClick={handleLogout} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition">Logout</button>
               <button onClick={() => setShowLogoutModal(false)} className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">Cancel</button>
