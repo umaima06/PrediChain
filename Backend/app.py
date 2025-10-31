@@ -137,6 +137,8 @@ import pandas as pd
 import os
 import json
 from typing import Optional
+# import FullMap from "frontend/predichain-frontend/src/pages/FullMap";
+# import FullMap from "./pages/FullMap";
 
 # local ML modules (keep your existing functions)
 from ml.forecast import generate_forecast

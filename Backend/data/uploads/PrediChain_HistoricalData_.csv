@@ -1,0 +1,9 @@
+Project_ID,Project_Name,Project_Type,Project_Size,Location,Start_Date,End_Date,Budget_Planned_Quantity,Material_Name,Quantity_Used,Planned_Quantity,Unit,Supplier_Name,Supplier_Reliability_Score,Average_Delivery_Time_Days,Delivery_Delays,Contractor_Team_Size,Number_of_Shifts_Work_Hours,Weather_Condition,Regional_Risk_Level,Notes_Special_Conditions,Project_Phase,Date_of_Materail_Usage
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Cement,4800,5000,Bags,UltraTech Cement,9.2,2.5,0,35,16,Sunny,Low,Foundation work — high strength mix,Foundation,20-02-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Steel Rods,3100,3200,Kg,Tata Steel,8.8,3.2,1,35,16,Sunny,Low,Slight rust prevention required,Framing,15-03-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Sand,8000,8200,Tons,Local Supplier,7.4,1.8,0,35,16,Sunny,Low,Supply interruptions during rains,Foundation,01-03-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Bricks,15000,15500,Nos,BrickMart,8.5,2,0,35,16,Sunny,Low,Foundation alignment adjustments,Foundation,25-02-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Concrete,4200,4300,Cubic M,UltraTech Cement,9,3,1,35,16,Cloudy,Low,Pouring delays due to rain,Foundation,05-03-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Steel Rods,2500,2600,Kg,Tata Steel,8.8,3.1,0,35,16,Sunny,Low,Rebar bending adjustments,Framing,20-03-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Sand,7800,8000,Tons,Local Supplier,7.4,1.7,0,35,16,Rainy,Low,Delayed delivery due to monsoon,Framing,18-03-2025
+P001,Sunrise Apartments,Residential,Large,Hyderabad,15-01-2025,10-04-2026,120000,Bricks,15200,15500,Nos,BrickMart,8.5,2.1,0,35,16,Sunny,Low,Extra brick orders for finishing,Framing,22-03-2025

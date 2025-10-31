@@ -7,8 +7,12 @@ import MetricCard from "../components/MetricCard";
 import MaterialForecastChart from "../components/MaterialForecastChart";
 import RecommendationPanel from "../components/RecommendationPanel";
 import HistoricalVsForecastChart from "../components/HistoricalVsForecastChart";
+import MapPreview from "../components/MapPreview";
+import { useNavigate } from "react-router-dom";
+import FullMap from "./FullMap";
 
 const Dashboard = ({ projectId }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [projectInfo, setProjectInfo] = useState(null);
   const [forecastData, setForecastData] = useState([]);
@@ -102,6 +106,16 @@ const Dashboard = ({ projectId }) => {
         <div>
           <RecommendationPanel recommendationsData={recommendationsData} />
         </div>
+      </div>
+
+       {/* 🗺️ Add map preview */}
+      <div className="mt-10">
+        <h2 className="text-xl font-semibold text-white mb-3">Project Location</h2>
+        <MapPreview
+          latitude={projectInfo?.latitude}
+          longitude={projectInfo?.longitude}
+          onClick={() => navigate(`/map/${projectInfo?.id}`)}
+        />
       </div>
     </Layout>
   );

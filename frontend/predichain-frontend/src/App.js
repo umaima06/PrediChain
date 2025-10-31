@@ -7,6 +7,7 @@ import CSVUpload from './pages/CSVUpload';
 import './index.css';
 import './components/LiquidEther.css'
 import Dashboard from './pages/Dashboard';
+import FullMap from "./pages/FullMap";
 
 function App() {
   return (
@@ -17,6 +18,8 @@ function App() {
         <Route path="/projects" element={<ProjectManagement />} />
         <Route path="/csv/:projId" element={<CSVUpload />} />
         <Route path="/dashboard/:projId" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/fullmap" element={<FullMap />} />
       </Routes>
     </Router>
   );

@@ -93,63 +93,6 @@ useEffect(() => {
   }
 }, []);
 
-//     // Validate CSV columns
-//     const reader = new FileReader();
-//     reader.onload = (event) => {
-//       const text = event.target.result;
-//       const rows = text.split('\n').filter(Boolean);
-//       if (rows.length < 1) return;
-
-//       // const headerCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-//       // const requiredCols = ['date_of_materail_usage', 'material_name', 'quantity_used'];
-//       // const missingCols = requiredCols.filter(c => !headerCols.includes(c));
-//       const requiredCols = [
-//         'Date_of_Materail_Usage', 
-//         'Material_Name', 
-//         'Quantity_Used'
-//       ];
-      
-//       // Convert CSV header to lowercase and trim for robust comparison
-//       const lowerHeaderCols = rows[0].split(',').map(h => h.trim().toLowerCase());
-//       const lowerRequiredCols = requiredCols.map(c => c.toLowerCase());
-    
-//       // Check if the lowercase required columns are present
-//       const missingCols = lowerRequiredCols.filter(c => !lowerHeaderCols.includes(c));
-//         if (missingCols.length > 0) {
-//           const missingPascalCase = missingCols.map(
-//             missingLower => requiredCols.find(rc => rc.toLowerCase() === missingLower)
-//           );
-//           alert(`CSV missing required columns: ${missingCols.join(', ')}`);
-//           return;
-//         }
-
-//       // Show first 5 rows as preview
-//       setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
-//     };
-//     reader.readAsText(file);
-
-//     // Upload to backend
-//     const data = new FormData();
-//     data.append("file", file);
-
-//     try {
-//       setLoading(true);
-//       const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
-//         headers: { 'Content-Type': 'multipart/form-data' }
-//       });
-//    setUploadedFile(file);
-// setFilename(res.data.filename);
-
-// // 🧠 persist uploaded filename in localStorage
-// localStorage.setItem("uploadedFilename", res.data.filename);
-//     } catch (err) {
-//       console.error("File upload failed:", err);
-//       alert("Upload failed, try again.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
   const handleGenerateForecast = async () => {
     if (!filename || !formData.material) {
       alert("Please upload CSV and select material first!");
@@ -194,7 +137,7 @@ useEffect(() => {
     { id: 1, title: "Project Overview", icon: <FaClipboardList /> },
     { id: 2, title: "Upload Historical Data", icon: <FaUpload /> },
     { id: 3, title: "Material & Inventory Details", icon: <FaCogs /> },
-    { id: 4, title: "Environmental Context", icon: <FaCloudSun /> },
+    { id: 4, title: "Location", icon: <FaCloudSun /> },
     { id: 5, title: "Generate Forecast", icon: <FaChartLine /> },
   ];
 
@@ -221,6 +164,55 @@ const handleInputChange = (e) => {
     [name]: value,
   }));
 };
+
+// ✅ Auto-fetch coordinates & weather when location fields change
+useEffect(() => {
+  if (!formData.localArea && !formData.city) return;
+
+  const timer = setTimeout(async () => {
+    try {
+      const geoKey = process.env.REACT_APP_OPENCAGE_KEY;
+      const fullLocation = `${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
+      const geoRes = await axios.get(
+        `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(fullLocation)}&key=${geoKey}`
+      );
+
+      const geometry = geoRes.data.results[0]?.geometry;
+      if (geometry) {
+        const lat = geometry.lat;
+        const lon = geometry.lng;
+
+        setFormData((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lon,
+        }));
+
+        // Fetch weather
+        const weatherKey = process.env.REACT_APP_OPENWEATHER_KEY;
+        const weatherRes = await axios.get(
+          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${weatherKey}&units=metric`
+        );
+
+        const data = weatherRes.data;
+        setFormData((prev) => ({
+          ...prev,
+          weather: data.weather[0].description,
+          temperature: data.main.temp,
+          humidity: data.main.humidity,
+          windSpeed: data.wind.speed,
+        }));
+      } else {
+        console.warn("❌ Could not fetch coordinates. Check city name.");
+      }
+    } catch (error) {
+      console.error("Geo/Weather fetch failed:", error);
+    }
+  }, 800); // Debounce: waits 800ms after last input change
+
+  return () => clearTimeout(timer);
+}, [formData.localArea, formData.city, formData.state, formData.pincode]);
+
   return (
     <div className="relative w-full min-h-screen overflow-hidden text-gray-200">
       <LiquidEther
@@ -476,29 +468,111 @@ const handleInputChange = (e) => {
   </div>
 )}
 
-          {/* Step 4: Environmental Context */}
-          {step === 4 && (
-            <div>
-              <h2 className="text-2xl font-semibold mb-4">Environmental Context</h2>
-              <p className="text-gray-300 mb-2">Current project conditions.</p>
-              <div className="grid gap-4">
-                <select name="weather" value={formData.weather} onChange={handleInputChange} className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]">
-                  <option value="">Weather Condition</option>
-                  <option>Sunny</option>
-                  <option>Rainy</option>
-                  <option>Humid</option>
-                  <option>Mixed</option>
-                </select>
-                <select name="region_risk" value={formData.region_risk} onChange={handleInputChange} className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]">
-                  <option value="">Region Risk Level</option>
-                  <option>Low</option>
-                  <option>Medium</option>
-                  <option>High</option>
-                </select>
-                <textarea name="notes" placeholder="Additional Notes / Context..." value={formData.notes} onChange={handleInputChange} className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]" />
-              </div>
-            </div>
-          )}
+          {/* Step 4: Location & Weather */}
+{step === 4 && (
+  <div>
+    <h2 className="text-2xl font-semibold mb-4">Location & Weather Insights</h2>
+    <p className="text-gray-300 mb-3">
+      Enter your project location — PrediChain will automatically fetch coordinates & weather data.
+    </p>
+
+    <div className="grid gap-4">
+      {/* Location Inputs */}
+      <input
+        name="localArea"
+        placeholder="Local Area / Locality"
+        value={formData.localArea || ''}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
+      />
+      <input
+        name="city"
+        placeholder="City"
+        value={formData.city || ''}
+        onChange={handleInputChange}
+        onBlur={async () => {
+          if (!formData.city) return;
+          try {
+            setLoading(true);
+            const geoKey = process.env.REACT_APP_OPENCAGE_KEY;
+            const fullLocation = `${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
+            const geoRes = await axios.get(
+              `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(fullLocation)}&key=${geoKey}`
+            );
+
+            const geometry = geoRes.data.results[0]?.geometry;
+            if (geometry) {
+              const lat = geometry.lat;
+              const lon = geometry.lng;
+
+              setFormData((prev) => ({
+                ...prev,
+                latitude: lat,
+                longitude: lon,
+              }));
+
+              // 🔁 Fetch weather automatically using OpenWeather
+              const weatherKey = process.env.REACT_APP_OPENWEATHER_KEY;
+              const weatherRes = await axios.get(
+                `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${weatherKey}&units=metric`
+              );
+
+              const data = weatherRes.data;
+              setFormData((prev) => ({
+                ...prev,
+                weather: data.weather[0].description,
+                temperature: data.main.temp,
+                humidity: data.main.humidity,
+                windSpeed: data.wind.speed,
+              }));
+            } else {
+              alert("❌ Could not fetch coordinates. Please check city name.");
+            }
+          } catch (error) {
+            console.error(error);
+            alert("Error fetching coordinates or weather data.");
+          } finally {
+            setLoading(false);
+          }
+        }}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
+      />
+
+      <input
+        name="state"
+        placeholder="State"
+        value={formData.state || ''}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
+      />
+
+      <input
+        name="pincode"
+        placeholder="Pincode (if applicable)"
+        value={formData.pincode || ''}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
+      />
+
+      {/* Show Geo & Weather */}
+      {(formData.latitude && formData.longitude) && (
+        <div className="bg-gray-800/60 p-4 rounded-lg text-gray-200">
+          <p><b>Latitude:</b> {formData.latitude}</p>
+          <p><b>Longitude:</b> {formData.longitude}</p>
+        </div>
+      )}
+
+      {formData.weather && (
+        <div className="bg-gray-800/60 p-4 rounded-lg text-gray-200">
+          <p><b>Condition:</b> {formData.weather}</p>
+          <p><b>Temperature:</b> {formData.temperature} °C</p>
+          <p><b>Humidity:</b> {formData.humidity}%</p>
+          <p><b>Wind Speed:</b> {formData.windSpeed} m/s</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
          {/* Step 5: Generate Forecast */}
               {step === 5 && (
