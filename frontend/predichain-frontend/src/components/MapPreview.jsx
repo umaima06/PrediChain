@@ -1,28 +1,33 @@
-import React, { useEffect } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+// src/components/MapPreview.jsx
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
-const MapPreview = ({ latitude, longitude, onClick }) => {
-  useEffect(() => {
-    if (!latitude || !longitude) return;
+const MapPreview = ({ formData }) => {
+  const navigate = useNavigate();
+  // const fullAddress = `${formData.buildingAddress || ''}, ${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
 
-    const map = L.map("mapPreview").setView([latitude, longitude], 10);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
-
-    L.marker([latitude, longitude]).addTo(map);
-
-    return () => map.remove();
-  }, [latitude, longitude]);
+   // ✅ Add fallback in case formData is undefined
+  const safeData = formData || {};
+  const fullAddress = `${safeData.buildingAddress || ''}, ${safeData.localArea || ''}, ${safeData.city || ''}, ${safeData.state || ''}, ${safeData.pincode || ''}`;
 
   return (
     <div
-      id="mapPreview"
-      className="h-64 rounded-xl shadow-lg cursor-pointer"
-      onClick={onClick}
-    ></div>
+      onClick={() => navigate("/full-map", { state: { formData: safeData } })}
+      className="cursor-pointer transform hover:scale-105 transition duration-300"
+    >
+      <iframe
+        title="Map Preview"
+        width="100%"
+        height="250"
+        style={{ border: 0, borderRadius: "12px" }}
+        loading="lazy"
+        allowFullScreen
+        src={`https://maps.google.com/maps?q=${encodeURIComponent(fullAddress)}&z=18&output=embed`}
+      ></iframe>
+      <p className="text-center mt-2 text-sm text-gray-400">
+        📍 Click to view full map
+      </p>
+    </div>
   );
 };
 

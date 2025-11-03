@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import { doc, setDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import LiquidEther from '../components/LiquidEther';
@@ -13,11 +15,20 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 const CSVUpload = () => {
   const { projId } = useParams();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (projId) {
+      localStorage.setItem("currentProjectId", projId);
+      console.log("✅ Project ID stored:", projId);
+    }
+  }, [projId]);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [filename, setFilename] = useState('');
   const [csvPreview, setCsvPreview] = useState([]);
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [formData, setFormData] = useState({
     projectName: '',
     projectType: '',
@@ -35,99 +46,103 @@ const CSVUpload = () => {
     projectBudget: '',
     weather: '',
     region_risk: '',
-    notes: ''
+    notes: '',
+    buildingAddress: '',
+    rainPossibility: '',
   });
 
-// ✅ Restore previously uploaded filename if available
-useEffect(() => {
-  const savedFilename = localStorage.getItem("uploadedFilename");
-  const savedFileName = localStorage.getItem("uploadedFileName");
+  const saveProjectDetails = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  if (savedFilename) setFilename(savedFilename);
-  if (savedFileName) setUploadedFile({ name: savedFileName });
-}, []);
+    const currentId = localStorage.getItem("currentProjectId");
+    if (!currentId) {
+      console.warn("❌ No currentProjectId in localStorage");
+      return;
+    }
 
-// ✅ File upload handler
-const handleFileUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+    const ref = doc(db, "users", user.uid, "projects", currentId);
+    await setDoc(ref, { ...formData, uploadedCsvFileName: filename || null }, { merge: true });
 
-  // ✅ Preview logic
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const text = event.target.result;
-    const rows = text.split('\n').filter(Boolean);
-    setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
-    localStorage.setItem("csvPreview", JSON.stringify(rows.slice(0, 6).map(r => r.split(','))));
+    console.log("✅ Project details saved to Firestore");
   };
-  reader.readAsText(file);
 
-  // ✅ Upload logic
-  const data = new FormData();
-  data.append("file", file);
+  useEffect(() => {
+    const savedFilename = localStorage.getItem("uploadedFilename");
+    const savedFileName = localStorage.getItem("uploadedFileName");
 
-  try {
-    setLoading(true);
-    const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    if (savedFilename) setFilename(savedFilename);
+    if (savedFileName) setUploadedFile({ name: savedFileName });
+  }, []);
 
-    setUploadedFile(file);
-    setFilename(res.data.filename);
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    // ✅ Save to localStorage
-    localStorage.setItem("uploadedFilename", res.data.filename);
-    localStorage.setItem("uploadedFileName", file.name);
-  } catch (err) {
-    console.error("File upload failed:", err);
-    alert("Upload failed, try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const rows = text.split('\n').filter(Boolean);
+      setCsvPreview(rows.slice(0, 6).map(r => r.split(',')));
+      localStorage.setItem("csvPreview", JSON.stringify(rows.slice(0, 6).map(r => r.split(','))));
+    };
+    reader.readAsText(file);
 
-useEffect(() => {
-  const savedPreview = localStorage.getItem("csvPreview");
-  if (savedPreview) {
-    setCsvPreview(JSON.parse(savedPreview));
-  }
-}, []);
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      setLoading(true);
+      const res = await axios.post('http://127.0.0.1:8000/upload-data', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setUploadedFile(file);
+      setFilename(res.data.filename);
+
+      localStorage.setItem("uploadedFilename", res.data.filename);
+      localStorage.setItem("uploadedFileName", file.name);
+    } catch (err) {
+      console.error("❌ File upload failed:", err);
+      alert("Upload failed, try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const savedPreview = localStorage.getItem("csvPreview");
+    if (savedPreview) setCsvPreview(JSON.parse(savedPreview));
+  }, []);
 
   const handleGenerateForecast = async () => {
+    const currentId = localStorage.getItem("currentProjectId");
+
     if (!filename || !formData.material) {
-      alert("Please upload CSV and select material first!");
+      alert("Upload CSV & select material first!");
       return;
     }
 
     try {
       setLoading(true);
       const forecastData = new FormData();
+      Object.entries(formData).forEach(([key, value]) =>
+        forecastData.append(key, value)
+      );
       forecastData.append("filename", filename);
-      forecastData.append("material", formData.material || formData.otherMaterial);
-      forecastData.append("horizon_months", formData.horizon_months);
-      forecastData.append("lead_time_days", formData.lead_time_days);
-      forecastData.append("current_inventory", formData.current_inventory);
-      forecastData.append("supplierReliability", formData.supplierReliability);
-      forecastData.append("deliveryTimeDays", formData.deliveryTimeDays);
-      forecastData.append("contractorTeamSize", formData.contractorTeamSize);
-      forecastData.append("projectBudget", formData.projectBudget);
-      forecastData.append("weather", formData.weather);
-      forecastData.append("region_risk", formData.region_risk);
-      forecastData.append("notes", formData.notes);
-      forecastData.append("projectName", formData.projectName);
-      forecastData.append("projectType", formData.projectType);
-      forecastData.append("location", formData.location);
-      forecastData.append("startDate", formData.startDate);
-      forecastData.append("endDate", formData.endDate);
+      forecastData.append("material", formData.material === "Other" ? formData.otherMaterial : formData.material);
 
       const res = await axios.post('http://127.0.0.1:8000/recommendation', forecastData);
-      console.log("Forecast result:", res.data);
+
+      console.log("✅ Forecast result:", res.data);
+      await saveProjectDetails();
 
       navigate(`/dashboard/${projId}`, { state: { forecast: res.data } });
+
       localStorage.removeItem("uploadedFilename");
     } catch (err) {
-      console.error("Forecast generation failed:", err);
-      alert("Forecast failed, check console for details.");
+      console.error("❌ Forecast failed:", err);
+      alert("Forecast failed!");
     } finally {
       setLoading(false);
     }
@@ -172,7 +187,7 @@ useEffect(() => {
   const timer = setTimeout(async () => {
     try {
       const geoKey = process.env.REACT_APP_OPENCAGE_KEY;
-      const fullLocation = `${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
+      const fullLocation = `${formData.buildingAddress || ''}, ${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
       const geoRes = await axios.get(
         `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(fullLocation)}&key=${geoKey}`
       );
@@ -182,10 +197,12 @@ useEffect(() => {
         const lat = geometry.lat;
         const lon = geometry.lng;
 
+        const formattedAddress = geoRes.data.results[0]?.formatted || '';
         setFormData((prev) => ({
           ...prev,
           latitude: lat,
           longitude: lon,
+          formattedAddress: formattedAddress
         }));
 
         // Fetch weather
@@ -195,12 +212,15 @@ useEffect(() => {
         );
 
         const data = weatherRes.data;
+        const current = data.current || {};
+        const daily = data.daily?.[0] || {};
         setFormData((prev) => ({
           ...prev,
           weather: data.weather[0].description,
           temperature: data.main.temp,
           humidity: data.main.humidity,
           windSpeed: data.wind.speed,
+          rainPossibility: daily.pop ? (daily.pop * 100).toFixed(1) : '0',
         }));
       } else {
         console.warn("❌ Could not fetch coordinates. Check city name.");
@@ -479,6 +499,17 @@ useEffect(() => {
     <div className="grid gap-4">
       {/* Location Inputs */}
       <input
+      type="text"
+      name="buildingAddress"
+      placeholder="Building / Land Address "
+      value={formData.buildingAddress}
+      className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
+      onChange={async (e) => {
+        const value = e.target.value;
+        setFormData({ ...formData, buildingAddress: value });
+      }}
+      />
+      <input
         name="localArea"
         placeholder="Local Area / Locality"
         value={formData.localArea || ''}
@@ -495,12 +526,13 @@ useEffect(() => {
           try {
             setLoading(true);
             const geoKey = process.env.REACT_APP_OPENCAGE_KEY;
-            const fullLocation = `${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
+            const fullLocation = `${formData.buildingAddress || ''}, ${formData.localArea || ''}, ${formData.city || ''}, ${formData.state || ''}, ${formData.pincode || ''}`;
             const geoRes = await axios.get(
               `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(fullLocation)}&key=${geoKey}`
             );
 
             const geometry = geoRes.data.results[0]?.geometry;
+            const formattedAddress = geoRes.data.results[0]?.formatted || "Address not found";
             if (geometry) {
               const lat = geometry.lat;
               const lon = geometry.lng;
@@ -509,6 +541,7 @@ useEffect(() => {
                 ...prev,
                 latitude: lat,
                 longitude: lon,
+                formattedAddress: formattedAddress
               }));
 
               // 🔁 Fetch weather automatically using OpenWeather
@@ -568,6 +601,7 @@ useEffect(() => {
           <p><b>Temperature:</b> {formData.temperature} °C</p>
           <p><b>Humidity:</b> {formData.humidity}%</p>
           <p><b>Wind Speed:</b> {formData.windSpeed} m/s</p>
+          <p><b>Rain Possibility:</b> {formData.rainPossibility}%</p>
         </div>
       )}
     </div>
@@ -583,6 +617,7 @@ useEffect(() => {
                   <div className="bg-gray-800/50 p-4 rounded-lg mb-6 text-sm text-gray-200 space-y-2">
                     <p><b>Project:</b> {formData.projectName}</p>
                     <p><b>Type:</b> {formData.projectType} | <b>Location:</b> {formData.location}</p>
+                    <p><b>Address:</b> {formData.buildingAddress || '—'}</p>
                     <p><b>Start → End:</b> {formData.startDate} → {formData.endDate}</p>
                     <p><b>Material:</b> {formData.material === 'Other' ? formData.otherMaterial : formData.material}</p>
                     <p><b>Forecast Horizon:</b> {formData.horizon_months} months</p>

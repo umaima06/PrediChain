@@ -1,122 +1,233 @@
 import React, { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import { db, auth } from "../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import axios from "axios";
+import { doc, getDoc } from "firebase/firestore";
 import MetricCard from "../components/MetricCard";
 import MaterialForecastChart from "../components/MaterialForecastChart";
 import RecommendationPanel from "../components/RecommendationPanel";
 import HistoricalVsForecastChart from "../components/HistoricalVsForecastChart";
+import MaterialTable from "../components/MaterialTable";
+import { getDashboardData } from "../services/dashboardService";
+import { useParams, useNavigate } from "react-router-dom";
 import MapPreview from "../components/MapPreview";
-import { useNavigate } from "react-router-dom";
 import FullMap from "./FullMap";
 
-const Dashboard = ({ projectId }) => {
+const Dashboard = () => {
   const navigate = useNavigate();
+  const { projId } = useParams(); // ✅ route param
+  const activeProjectId = projId || localStorage.getItem("currentProjectId"); // ✅ fallback
+
   const [loading, setLoading] = useState(true);
   const [projectInfo, setProjectInfo] = useState(null);
   const [forecastData, setForecastData] = useState([]);
   const [recommendationsData, setRecommendationsData] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
-  // 1️⃣ Fetch project info from Firebase
+  // ✅ Fetch project info from Firestore
   useEffect(() => {
-    const fetchProjectData = async () => {
+  const unsubscribe = auth.onAuthStateChanged(async (user) => {
+    console.log("👤 Auth resolved:", user?.uid);
+
+    if (!user) {
+      console.warn("⚠️ User not logged in yet");
+      return;
+    }
+
+    if (!activeProjectId) {
+      console.warn("⚠️ No project ID found");
+      return;
+    }
+
+    const docRef = doc(db, "users", user.uid, "projects", activeProjectId);
+    console.log("📂 Firestore path:", `/users/${user.uid}/projects/${activeProjectId}`);
+
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      console.log("✅ Project Data:", data);
+      console.log("📍 Stored Lat/Lon:", data.latitude, data.longitude);
+
+      // ✅ Force add projectId if missing
+      data.projectId = activeProjectId;
+
+      setProjectInfo(data);
+    } else {
+      console.warn("❌ Project not found!");
+    }
+  });
+
+  return () => unsubscribe();
+}, [projId, activeProjectId]);
+
+  // ✅ Fetch ML dashboard results
+  useEffect(() => {
+    if (!projectInfo) return;
+
+    const loadDashboard = async () => {
+      setLoading(true);
       try {
-        if (!auth.currentUser) return;
+        const allForecasts = [];
+        const allRecs = [];
 
-        const projectsRef = collection(db, "projects");
-        const q = query(projectsRef, where("uid", "==", auth.currentUser.uid));
-        const snapshot = await getDocs(q);
+        const materials = projectInfo.materials || [projectInfo.material];
 
-        if (!snapshot.empty) {
-          const docData = snapshot.docs[0].data();
-          setProjectInfo(docData);
-          setInventoryData(docData.inventory || []);
+        for (let material of materials) {
+          const fd = new FormData();
+          fd.append("filename", projectInfo.uploadedCsvFileName);
+          fd.append("material", material);
+          fd.append("lead_time_days", projectInfo.lead_time_days || 10);
+          fd.append("current_inventory", projectInfo.current_inventory || 0);
+          fd.append("supplierReliability", projectInfo.supplierReliability || 100);
+          fd.append("projectBudget", projectInfo.projectBudget || 0);
+          fd.append("location", projectInfo.location || "");
+          fd.append("projectName", projectInfo.projectName || "");
+          fd.append("projectType", projectInfo.projectType || "");
+          fd.append("startDate", projectInfo.startDate || "");
+          fd.append("endDate", projectInfo.endDate || "");
+
+          const result = await getDashboardData(fd);
+      // OLD
+// allForecasts.push(...(result.forecast || []));
+// allRecs.push(...(result.recommendations || []));
+
+// ✅ NEW
+allForecasts.push(
+  ...(result.forecast || []).map(f => ({ ...f, material }))
+);
+
+allRecs.push(
+  ...(result.recommendations || []).map(r => ({ ...r, material }))
+);
         }
+
+        setForecastData(allForecasts);
+        setRecommendationsData(allRecs);
       } catch (err) {
-        console.error("Error fetching project dashboard data:", err);
+        console.error("🔥 Dashboard ML error:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProjectData();
-  }, [projectId]);
-
-  // 2️⃣ Fetch forecast + recommendations from backend
-  useEffect(() => {
-    const fetchForecastAndRecommendations = async () => {
-      if (!projectInfo) return;
-
-      try {
-        // Assume projectInfo.materials = ["Cement", "Steel Rebar", "Gravel"]
-        const allForecasts = [];
-        const allRecommendations = [];
-
-        for (let material of projectInfo.materials || []) {
-          const formData = new FormData();
-          formData.append('filename', projectInfo.uploadedCsvFileName); // CSV uploaded earlier
-          formData.append('material', material);
-          formData.append('lead_time_days', projectInfo.lead_time_days || 10);
-          formData.append('current_inventory', projectInfo.inventory?.find(i => i.material === material)?.quantity || 0);
-
-          const res = await axios.post('http://127.0.0.1:8000/recommendation', formData);
-          allForecasts.push(...res.data.forecast);
-          allRecommendations.push(...res.data.recommendations);
-        }
-
-        setForecastData(allForecasts);
-        setRecommendationsData(allRecommendations);
-      } catch (err) {
-        console.error("Error fetching forecast/recommendations:", err);
-      }
-    };
-
-    fetchForecastAndRecommendations();
+    loadDashboard();
   }, [projectInfo]);
 
   if (loading) return <Layout><p className="text-white">Loading dashboard...</p></Layout>;
-  if (!projectInfo) return <Layout><p className="text-white">No project data found</p></Layout>;
+  if (!projectInfo) return <Layout><p className="text-white">No project info found</p></Layout>;
 
-  // --- Metrics calculations ---
+  // ✅ Prepare map data safely once projectInfo is loaded
+  const mapData = {
+    buildingAddress: projectInfo.buildingAddress || "",
+    localArea: projectInfo.localArea || "",
+    city: projectInfo.city || "",
+    state: projectInfo.state || "",
+    pincode: projectInfo.pincode || "",
+    latitude: projectInfo.latitude || "",
+    longitude: projectInfo.longitude || "",
+    location: projectInfo.location || ""
+  };
+
+  // ✅ Calculations
   const totalForecast = forecastData.reduce((acc, item) => acc + (item.forecasted_demand || 0), 0);
   const currentInventory = inventoryData.reduce((acc, item) => acc + (item.quantity || 0), 0);
-  const avgSupplierReliability = projectInfo?.supplierReliability || 0;
-  const budgetStatus = projectInfo?.projectBudget || 0;
-  const leadTime = projectInfo?.lead_time_days || 0;
-
+   console.log("📦 Material table data:", forecastData);
   return (
-    <Layout projectName={projectInfo?.projectName} projectStatus={projectInfo?.status || "Active"}>
-      {/* --- Top Metrics Row --- */}
+    <Layout projectName={projectInfo.projectName} projectStatus={projectInfo.status || "Active"}>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <MetricCard title="Total Forecasted Material" value={`${totalForecast.toLocaleString()} tons`} progress={70} gradientClass="bg-gradient-to-r from-purple-600 to-indigo-500" />
-        <MetricCard title="Current Inventory" value={`${currentInventory.toLocaleString()} tons`} progress={(currentInventory/totalForecast)*100} gradientClass="bg-gradient-to-r from-green-500 to-teal-400" />
-        <MetricCard title="Supplier Reliability" value={`${avgSupplierReliability}%`} progress={avgSupplierReliability} gradientClass="bg-gradient-to-r from-yellow-400 to-orange-500" />
-        <MetricCard title="Budget Status" value={`$${budgetStatus.toLocaleString()}`} progress={60} gradientClass="bg-gradient-to-r from-pink-500 to-red-500" />
-        <MetricCard title="Lead Time (Days)" value={leadTime} progress={50} gradientClass="bg-gradient-to-r from-blue-500 to-cyan-500" />
-      </div>
+       <MetricCard
+  title="Total Forecasted Material"
+  value={`${totalForecast.toLocaleString()} tons`}
+  progress={70}
+  gradientClass="bg-gradient-to-br from-[#005C97] to-[#363795]" // blue steel
+/>
 
-      {/* --- Forecast Section --- */}
+<MetricCard
+  title="Current Inventory"
+  value={`${currentInventory.toLocaleString()} tons`}
+  progress={(totalForecast>0?(currentInventory/totalForecast)*100:0)}
+  gradientClass="bg-gradient-to-br from-[#0f2027] via-[#203a43] to-[#2c5364]" // carbon teal
+/>
+
+<MetricCard
+  title="Supplier Reliability"
+  value={`${projectInfo.supplierReliability}%`}
+  progress={projectInfo.supplierReliability}
+  gradientClass="bg-gradient-to-br from-[#1d976c] to-[#93f9b9]" // green mint reliability
+/>
+
+<MetricCard
+  title="Budget Status"
+  value={`$${projectInfo.projectBudget}`}
+  progress={60}
+  gradientClass="bg-gradient-to-br from-[#c04848] to-[#480048]" // maroon luxury
+/>
+
+<MetricCard
+  title="Lead Time"
+  value={`${projectInfo.lead_time_days} days`}
+  progress={50}
+  gradientClass="bg-gradient-to-br from-[#5f2c82] to-[#49a09d]" // purple x aqua
+/>
+      </div>
+    
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
           <MaterialForecastChart forecastData={forecastData} />
           <HistoricalVsForecastChart forecastData={forecastData} />
-        </div>
-        <div>
-          <RecommendationPanel recommendationsData={recommendationsData} />
-        </div>
-      </div>
+          
+          {/* 📍 Google Map Preview Section */}
+          <div className="bg-[#1e293b] p-4 rounded-xl shadow-md">
+            <h2 className="text-lg font-semibold text-white mb-2">📍 Project Location</h2>
+            
+            {/* ✅ Add Map Preview here */}
+            {mapData.city || mapData.state ? (
+              <div className="mt-6 cursor-pointer"
+              onClick={() => navigate(`/fullmap/${projId}`, {  state: {
+                locationData: {
+                  latitude: mapData.latitude,
+                  longitude: mapData.longitude,
+                  buildingAddress: mapData.buildingAddress,
+                  localArea: mapData.localArea,
+                  city: mapData.city,
+                  state: mapData.state,
+                  weather: projectInfo.weather,
+                  temperature: projectInfo.temperature,
+                  humidity: projectInfo.humidity,
+                  windSpeed: projectInfo.windSpeed,
+                  rainPossibility: projectInfo.rainPossibility},
+              },
+            })
+          }
+          >
+      <MapPreview formData={mapData} />
+    </div>
+  ) : (
+    <p className="text-gray-400">No location data available.</p>
+  )}
+</div>
 
-       {/* 🗺️ Add map preview */}
-      <div className="mt-10">
-        <h2 className="text-xl font-semibold text-white mb-3">Project Location</h2>
-        <MapPreview
-          latitude={projectInfo?.latitude}
-          longitude={projectInfo?.longitude}
-          onClick={() => navigate(`/map/${projectInfo?.id}`)}
-        />
-      </div>
+
+    {/* ✅ Material table same width as charts */}
+    <MaterialTable
+      materials={forecastData.map(item => {
+        const forecast = item.forecasted_demand ?? item.forecast ?? 0;
+        const inventory = projectInfo.current_inventory ?? 0;
+
+        return {
+          material: item.material || "Unknown",
+          forecast,
+          inventory,
+          supplier: projectInfo.supplierName || "N/A",
+          leadTime: projectInfo.lead_time_days || "-",
+          action: forecast > inventory ? "urgent" : "ok",
+        };
+      })}
+    />
+  </div>
+
+  <RecommendationPanel recommendationsData={recommendationsData} />
+</div>
     </Layout>
   );
 };

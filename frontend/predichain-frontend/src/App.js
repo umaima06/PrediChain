@@ -19,7 +19,9 @@ function App() {
         <Route path="/csv/:projId" element={<CSVUpload />} />
         <Route path="/dashboard/:projId" element={<Dashboard />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/fullmap" element={<FullMap />} />
+        <Route path="/fullmap/:projectId" element={<FullMap />} />
+        <Route path="/map/:projId" element={<FullMap />} />
+        <Route path="/full-map" element={<FullMap />} />
       </Routes>
     </Router>
   );

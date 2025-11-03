@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaPlus, FaMapMarkerAlt, FaProjectDiagram } from 'react-icons/fa';
 import { db, auth } from "../firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
 import Navbar from '../components/Navbar';
-import FeatureCard from '../components/FeatureCard';
-import BenefitCard from '../components/BenefitCard';
 import Footer from '../components/Footer';
 import LiquidEther from '../components/LiquidEther';
 
@@ -80,9 +78,11 @@ const ProjectManagement = () => {
           const exists = userProjects.find(p => p.name === dummy.name);
           if (!exists) {
             const docRef = await addDoc(userProjectsRef, {
-              ...dummy,
-              owner: user.email || user.uid
-            });
+  ...dummy,
+  owner: user.email || user.uid,
+  projectId: null,
+});
+await updateDoc(doc(db, "users", user.uid, "projects", docRef.id), { projectId: docRef.id });
             userProjects.push({ id: docRef.id, ...dummy, owner: user.email || user.uid });
           }
         }
@@ -114,10 +114,14 @@ const ProjectManagement = () => {
     try {
       const userProjectsRef = collection(db, "users", user.uid, "projects");
       const docRef = await addDoc(userProjectsRef, {
-        ...newProject,
-        status: "Active",
-        owner: user.email,
-      });
+  ...newProject,
+  status: "Active",
+  owner: user.email,
+  projectId: null, // temp placeholder, will set below
+});
+
+// ✅ Now update with docRef.id
+await updateDoc(docRef, { projectId: docRef.id });
 
       setProjects([...projects, { id: docRef.id, ...newProject, owner: user.email }]);
       setNewProject({ name: '', location: '', type: '', startDate: '', endDate: '' });
@@ -257,7 +261,10 @@ const ProjectManagement = () => {
             <div
               key={proj.id}
               className={`p-6 rounded-2xl shadow-lg backdrop-blur-lg border border-white/20 transition-transform hover:scale-105 cursor-pointer bg-gradient-to-r ${statusColors[proj.status] || "from-gray-700 to-gray-900 text-white"}`}
-              onClick={() => setOpenCard(openCard === proj.id ? null : proj.id)}
+             onClick={() => {
+  setOpenCard(openCard === proj.id ? null : proj.id);
+  localStorage.setItem("currentProjectId", proj.id); // ✅ ensure projectId always stored
+}}
             >
               <div className="flex items-center gap-3 mb-2">
                 <FaProjectDiagram className="text-3xl" />
@@ -272,10 +279,11 @@ const ProjectManagement = () => {
                   <p><strong>Owner:</strong> {proj.owner}</p>
 
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCSVRedirect(proj.id);
-                    }}
+                   onClick={(e) => {
+                         e.stopPropagation();
+                         localStorage.setItem("currentProjectId", proj.id); // ✅ store projectId globally
+                         handleCSVRedirect(proj.id);
+                  }}
                     className="w-full mt-2 px-4 py-2 bg-gradient-to-r from-[#5C3AFF] to-[#A883FF] text-white rounded-lg hover:scale-105 transition"
                   >
                     Upload CSV
