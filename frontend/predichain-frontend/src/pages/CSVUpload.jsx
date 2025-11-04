@@ -118,21 +118,24 @@ const CSVUpload = () => {
   const handleGenerateForecast = async () => {
     const currentId = localStorage.getItem("currentProjectId");
 
-    if (!filename || !formData.material) {
-      alert("Upload CSV & select material first!");
-      return;
-    }
+   if (!filename || !formData.materials || formData.materials.length === 0) {
+  alert("Upload CSV & add at least one material first!");
+  return;
+}
 
     try {
       setLoading(true);
       const forecastData = new FormData();
-      Object.entries(formData).forEach(([key, value]) =>
-        forecastData.append(key, value)
-      );
+     Object.entries(formData).forEach(([key, value]) => {
+  if (key !== "materials") {
+    forecastData.append(key, value);
+  }
+});
       forecastData.append("filename", filename);
-      forecastData.append("material", formData.material === "Other" ? formData.otherMaterial : formData.material);
+     // ✅ Attach materials list as JSON
+      forecastData.append("materials", JSON.stringify(formData.materials || []));
 
-      const res = await axios.post('http://127.0.0.1:8000/recommendation', forecastData);
+      const res = await axios.post('http://127.0.0.1:8000/recommendation', forecastData, {headers: {"Content-Type": "multipart/form-data" }});
 
       console.log("✅ Forecast result:", res.data);
       await saveProjectDetails();
@@ -178,6 +181,42 @@ const handleInputChange = (e) => {
     ...prev,
     [name]: value,
   }));
+};
+
+const addMaterial = () => {
+  const materialName =
+    formData.tempMaterial === "Other" ? formData.tempOtherMaterial : formData.tempMaterial;
+
+  const newMaterial = {
+    material: materialName,
+    horizon_months: formData.tempHorizon,
+    lead_time_days: formData.tempLeadTime,
+    current_inventory: formData.tempInventory,
+    supplierReliability: formData.tempSupplier,
+    deliveryTimeDays: formData.tempDelivery,
+    contractorTeamSize: formData.tempTeam,
+    projectBudget: formData.tempBudget
+  };
+
+  setFormData({
+    ...formData,
+    materials: [...(formData.materials || []), newMaterial],
+    tempMaterial: "",
+    tempOtherMaterial: "",
+    tempHorizon: "",
+    tempLeadTime: "",
+    tempInventory: "",
+    tempSupplier: "",
+    tempDelivery: "",
+    tempTeam: "",
+    tempBudget: ""
+  });
+};
+
+const removeMaterial = (index) => {
+  const updated = [...formData.materials];
+  updated.splice(index, 1);
+  setFormData({ ...formData, materials: updated });
 };
 
 // ✅ Auto-fetch coordinates & weather when location fields change
@@ -355,136 +394,162 @@ useEffect(() => {
 )}
           
 
-          {/* Step 3: Material & Inventory Details */}
+       {/* ✅ Step 3: Materials & Inventory Details */}
 {step === 3 && (
   <div>
-    <h2 className="text-2xl font-semibold mb-4">Material & Inventory Details</h2>
-    <p className="text-gray-300 mb-4">Provide material and inventory info for the current project. Each field has a short description to help you fill it correctly.</p>
+    <h2 className="text-2xl font-semibold mb-4 text-white">Materials & Inventory</h2>
+    <p className="text-gray-300 mb-4">
+      Add all materials required for this project.
+    </p>
 
-    <div className="grid gap-4">
+    {/* 🧾 Form to Add a Material */}
+    <div className="grid gap-4 bg-gray-800/40 p-4 rounded-xl border border-gray-700">
 
       {/* Material */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Select the material you will use for this project.</p>
-        <select
-          name="material"
-          value={formData.material}
-          onChange={handleInputChange}
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        >
-          <option value="">Select Material</option>
-          <option>Cement</option>
-          <option>Steel</option>
-          <option>Asphalt</option>
-          <option>Sand</option>
-          <option>Bricks</option>
-          <option>Aggregate</option>
-          <option value="Other">Other</option>
-        </select>
-        {formData.material === "Other" && (
-          <input
-            type="text"
-            name="otherMaterial"
-            placeholder="Specify other material"
-            value={formData.otherMaterial}
-            onChange={handleInputChange}
-            className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-          />
-        )}
-      </div>
+      <select
+        name="tempMaterial"
+        value={formData.tempMaterial || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-indigo-500 text-white"
+      >
+        <option value="">Select Material</option>
+        <option>Cement</option>
+        <option>Steel</option>
+        <option>Asphalt</option>
+        <option>Sand</option>
+        <option>Bricks</option>
+        <option>Aggregate</option>
+        <option value="Other">Other</option>
+      </select>
 
-      {/* Forecast Horizon */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Number of months to forecast material usage for this project.</p>
+      {/* Other Material field */}
+      {formData.tempMaterial === "Other" && (
         <input
-          type="number"
-          name="horizon_months"
-          value={formData.horizon_months}
+          type="text"
+          name="tempOtherMaterial"
+          placeholder="Specify other material"
+          value={formData.tempOtherMaterial || ""}
           onChange={handleInputChange}
-          placeholder="Forecast Horizon (months)"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
+          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white focus:ring-2 focus:ring-indigo-500"
         />
-      </div>
+      )}
+
+      {/* Forecast */}
+      <input
+        type="number"
+        name="tempHorizon"
+        placeholder="Forecast Horizon (months)"
+        value={formData.tempHorizon || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
       {/* Lead Time */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Average lead time in days to get this material delivered to your site.</p>
-        <input
-          type="number"
-          name="lead_time_days"
-          value={formData.lead_time_days}
-          onChange={handleInputChange}
-          placeholder="Lead Time (days)"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        />
-      </div>
+      <input
+        type="number"
+        name="tempLeadTime"
+        placeholder="Lead Time (days)"
+        value={formData.tempLeadTime || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
-      {/* Current Inventory */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Current inventory of this material on site (in tons).</p>
-        <input
-          type="number"
-          name="current_inventory"
-          value={formData.current_inventory}
-          onChange={handleInputChange}
-          placeholder="Current Inventory (tons)"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        />
-      </div>
+      {/* Inventory */}
+      <input
+        type="number"
+        name="tempInventory"
+        placeholder="Current Inventory (tons)"
+        value={formData.tempInventory || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
       {/* Supplier Reliability */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Supplier reliability in percentage. Higher means consistent deliveries.</p>
-        <input
-          type="number"
-          name="supplierReliability"
-          value={formData.supplierReliability}
-          onChange={handleInputChange}
-          placeholder="Supplier reliability (%)"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        />
-      </div>
+      <input
+        type="number"
+        name="tempSupplier"
+        placeholder="Supplier reliability (%)"
+        value={formData.tempSupplier || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
-      {/* Average Delivery Time */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Average number of days it takes for this material to reach your site.</p>
-        <input
-          type="number"
-          name="deliveryTimeDays"
-          value={formData.deliveryTimeDays}
-          onChange={handleInputChange}
-          placeholder="Average delivery time (days)"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        />
-      </div>
+      {/* Delivery time */}
+      <input
+        type="number"
+        name="tempDelivery"
+        placeholder="Avg delivery time (days)"
+        value={formData.tempDelivery || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
-      {/* Contractor Team Size */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Number of people in the contractor team for this project.</p>
-        <input
-          type="number"
-          name="contractorTeamSize"
-          value={formData.contractorTeamSize}
-          onChange={handleInputChange}
-          placeholder="Contractor team size"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        />
-      </div>
+      {/* Team size */}
+      <input
+        type="number"
+        name="tempTeam"
+        placeholder="Contractor team size"
+        value={formData.tempTeam || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
-      {/* Project Budget */}
-      <div className="flex flex-col gap-1">
-        <p className="text-gray-300 text-sm">Budget allocated for this project (USD).</p>
-        <input
-          type="number"
-          name="projectBudget"
-          value={formData.projectBudget}
-          onChange={handleInputChange}
-          placeholder="Project budget (USD)"
-          className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 focus:ring-2 focus:ring-[#5C3AFF]"
-        />
-      </div>
+      {/* Budget */}
+      <input
+        type="number"
+        name="tempBudget"
+        placeholder="Material budget (INR)"
+        value={formData.tempBudget || ""}
+        onChange={handleInputChange}
+        className="p-3 rounded-lg bg-gray-900/60 border border-gray-600 text-white"
+      />
 
+      {/* ➕ ADD Button */}
+      <button
+        onClick={addMaterial}
+        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg"
+      >
+        ➕ Add Material
+      </button>
     </div>
+
+    {/* 📋 Table of Added Materials */}
+    {formData.materials && formData.materials.length > 0 && (
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold mb-2 text-white">Added Materials</h3>
+
+        <table className="w-full text-left border border-gray-700 text-white">
+          <thead>
+            <tr className="bg-gray-900/80">
+              <th className="p-2 border border-gray-700">Material</th>
+              <th className="p-2 border border-gray-700">Inventory</th>
+              <th className="p-2 border border-gray-700">Reliability</th>
+              <th className="p-2 border border-gray-700">Budget</th>
+              <th className="p-2 border border-gray-700">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {formData.materials.map((m, i) => (
+              <tr key={i} className="border-b border-gray-700">
+                <td className="p-2">{m.material}</td>
+                <td className="p-2">{m.current_inventory}</td>
+                <td className="p-2">{m.supplierReliability}%</td>
+                <td className="p-2">₹{m.projectBudget}</td>
+                <td className="p-2">
+                  <button
+                    onClick={() => removeMaterial(i)}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    ❌
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
   </div>
 )}
 
@@ -614,21 +679,64 @@ useEffect(() => {
                   <h2 className="text-2xl font-semibold mb-4">Review & Generate Forecast</h2>
                   <p className="text-gray-300 mb-4">Check your data before generating AI-powered predictions.</p>
 
-                  <div className="bg-gray-800/50 p-4 rounded-lg mb-6 text-sm text-gray-200 space-y-2">
-                    <p><b>Project:</b> {formData.projectName}</p>
-                    <p><b>Type:</b> {formData.projectType} | <b>Location:</b> {formData.location}</p>
-                    <p><b>Address:</b> {formData.buildingAddress || '—'}</p>
-                    <p><b>Start → End:</b> {formData.startDate} → {formData.endDate}</p>
-                    <p><b>Material:</b> {formData.material === 'Other' ? formData.otherMaterial : formData.material}</p>
-                    <p><b>Forecast Horizon:</b> {formData.horizon_months} months</p>
-                    <p><b>Lead Time:</b> {formData.lead_time_days} days | <b>Current Inventory:</b> {formData.current_inventory}</p>
-                    <p><b>Supplier Reliability:</b> {formData.supplierReliability}% | <b>Delivery Time:</b> {formData.deliveryTimeDays} days</p>
-                    <p><b>Contractor Team:</b> {formData.contractorTeamSize} | <b>Budget:</b> ${formData.projectBudget}</p>
-                    <p><b>Weather:</b> {formData.weather} | <b>Region Risk:</b> {formData.region_risk}</p>
-                    <p><b>Notes:</b> {formData.notes}</p>
-                  <p><b>CSV File:</b> {uploadedFile ? uploadedFile.name : filename ? filename : "No file uploaded"}</p>
-                  </div>
+                 <div className="bg-gray-800/50 p-4 rounded-lg mb-6 text-sm text-gray-200 space-y-2">
 
+  {/* ✅ Project Info */}
+  <p><b>Project Name:</b> {formData.projectName}</p>
+  <p><b>Project Type:</b> {formData.projectType}</p>
+  <p><b>Start Date:</b> {formData.startDate}</p>
+  <p><b>End Date:</b> {formData.endDate}</p>
+
+  {/* ✅ Location Info */}
+  <p className="mt-2 font-semibold text-indigo-300">📍 Location Details</p>
+  <p><b>Address:</b> {formData.buildingAddress || "—"}</p>
+  <p><b>Area:</b> {formData.localArea || "—"}</p>
+  <p><b>City:</b> {formData.city || "—"}</p>
+  <p><b>State:</b> {formData.state || "—"}</p>
+  <p><b>Pincode:</b> {formData.pincode || "—"}</p>
+  <p><b>Latitude:</b> {formData.latitude || "—"}</p>
+  <p><b>Longitude:</b> {formData.longitude || "—"}</p>
+  <p><b>Formatted Address:</b> {formData.formattedAddress || "—"}</p>
+
+  {/* ✅ Weather Info */}
+  {formData.weather && (
+    <>
+      <p className="mt-2 font-semibold text-blue-300">🌤 Weather Insights</p>
+      <p><b>Condition:</b> {formData.weather}</p>
+      <p><b>Temperature:</b> {formData.temperature} °C</p>
+      <p><b>Humidity:</b> {formData.humidity}%</p>
+      <p><b>Wind Speed:</b> {formData.windSpeed} m/s</p>
+      <p><b>Rain Possibility:</b> {formData.rainPossibility || "—"}%</p>
+    </>
+  )}
+
+  {/* ✅ Materials Section */}
+  <p className="mt-2 font-semibold text-green-300">🧱 Materials & Inventory</p>
+
+  {formData.materials && formData.materials.length > 0 ? (
+    <ul className="list-disc ml-6 space-y-1">
+      {formData.materials.map((m, i) => (
+        <li key={i}>
+          <b>{m.material}</b>  
+          <br/>Forecast Horizon: {m.horizon_months} months  
+          <br/>Lead Time: {m.lead_time_days} days  
+          <br/>Inventory: {m.current_inventory} units  
+          <br/>Supplier Reliability: {m.supplierReliability}%  
+          <br/>Avg Delivery Time: {m.deliveryTimeDays} days  
+          <br/>Team Size: {m.contractorTeamSize}  
+          <br/>Budget: ₹{m.projectBudget}  
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p>— No materials added</p>
+  )}
+
+  {/* ✅ Notes & CSV */}
+  <p className="mt-2"><b>Notes:</b> {formData.notes || "—"}</p>
+  <p><b>CSV File:</b> {uploadedFile ? uploadedFile.name : (filename || "No file uploaded")}</p>
+
+</div>
                   <button
                     disabled={loading}
                     onClick={handleGenerateForecast}
