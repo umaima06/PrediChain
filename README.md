@@ -167,6 +167,7 @@ These formulas guide when and how much to order for each material, directly redu
             │        └── 📄 cement_forecast.csv
 
     │  ├── ⚙️ app.py                    # FastAPI app entry point
+    │  ├── ⚙️ .env
     │  ├── 📄 requirements.txt          # Dependency list
     │  ├── 📄 generate_sample_data.py   # Script to generate sample/synthetic data
     │  ├── 🧠 venv                      # Virtual environment
@@ -176,8 +177,7 @@ These formulas guide when and how much to order for each material, directly redu
     │  │   ├── 📁 share/
     │  │   ├── 📄 .gitignore
     │  │   └── 📄 pyvenv.cfg
-    │  ├── 📄 .gitignore
-    │  └── 📝 README.md
+    │  └── 📄 .gitignore
 
 
 ---
@@ -193,27 +193,60 @@ These formulas guide when and how much to order for each material, directly redu
 │   │   │
 │   │   ├── 📁 src
 │   │   │   ├── 📁 components
+│   │   │   │   ├── 📄 axiosConfig.js
 │   │   │   │   ├── 📄 BenefitCard.jsx
+│   │   │   │   ├── 📄 Chatbot.jsx
+│   │   │   │   ├── 📄 ComparisonChart.jsx
 │   │   │   │   ├── 📄 FeatureCard.jsx
 │   │   │   │   ├── 📄 Footer.jsx
 │   │   │   │   ├── 📄 Hero.jsx
+│   │   │   │   ├── 📄 HistoricalVsForecastChart.jsx
+│   │   │   │   ├── 📄 Layout.jsx
 │   │   │   │   ├── 📄 LiquidEther.js
 │   │   │   │   ├── 📄 LiquidEther.css
+│   │   │   │   ├── 📄 MapPreview.jsx
+│   │   │   │   ├── 📄 Mapsection.jsx
+│   │   │   │   ├── 📄 MaterialForecastChart.jsx
+│   │   │   │   ├── 📄 MaterialTable.jsx
+│   │   │   │   ├── 📄 MetricCard.jsx
 │   │   │   │   ├── 📄 Navbar.jsx
-│   │   │   │   └── 📄 ThemeToggle.jsx
+│   │   │   │   ├── 📄 RecommendationPanel.jsx
+│   │   │   │   ├── 📄 Sidebar.jsx
+│   │   │   │   ├── 📄 ThemeToggle.jsx
+│   │   │   │   └── 📄 Topbar.jsx
 │   │   │   │
 │   │   │   ├── 📁 pages
 │   │   │   │   ├── 📄 Auth.jsx
+│   │   │   │   ├── 📄 CSVUpload.jsx
+│   │   │   │   ├── 📄 Dashbaord.jsx
+│   │   │   │   ├── 📄 FullMap.jsx
 │   │   │   │   ├── 📄 Home.jsx
 │   │   │   │   └── 📄 ProjectManagement.jsx
 │   │   │   │
+│   │   │   ├── 📁 Services
+│   │   │   │   ├── 📄 dashboardService.js
+│   │   │   │
+│   │   │   ├── 📁 utils
+│   │   │   │   ├── 📄 api.js
+│   │   │   │
 │   │   │   ├── 📄 App.js
 │   │   │   ├── 📄 index.js
+│   │   │   ├── 📄 firebase.js
 │   │   │   └── 📄 index.css
 │   │   │
+│   │   ├── ⚙️ .env
 │   │   ├── 📄 .gitignore
+│   │   ├── 📄 firebaseConfig.js
+│   │   ├── 📄 package-lock.json
 │   │   ├── 📄 package.json
-│   │   └── 📄 package-lock.json
+│   │   ├── 📄 postcss.config.js
+│   │   ├── 📝 README.md
+│   │   ├── 📄 tailwind.config.js
+│   │
+│   ├── 📄 postcss.config.js
+│   ├── 📄 tailwind.config.js
+│   ├── 📄 package.json
+│   └── 📄 package-lock.json
 
 ---
 
