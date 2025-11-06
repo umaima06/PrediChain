@@ -1,0 +1,14 @@
+Project_ID,Project_Name,Project_Type,Project_Size,Location,Start_Date,End_Date,Budget_Planned_Quantity,Material_Name,Quantity_Used,Planned_Quantity,Unit,Supplier_Name,Supplier_Reliability_Score,Average_Delivery_Time_Days,Delivery_Delays,Contractor_Team_Size,Number_of_Shifts_Work_Hours,Weather_Condition,Regional_Risk_Level,Notes_Special_Conditions,Project_Phase,Date_of_Materail_Usage
+P001,metro bridge,bridge,large,hyderabad,01-01-2024,31-12-2025,20000,cement,1200,1300,tons,ultra tech,90,5,1,40,8,sunny,medium,normal operations,foundation,15-01-2024
+P002,metro bridge,bridge,large,hyderabad,01-01-2024,31-12-2025,20000,steel,950,1000,tons,tata steel,87,6,2,40,8,sunny,medium,stable supply,foundation,15-01-2024
+P003,metro bridge,bridge,large,hyderabad,02-01-2024,01-01-2026,20000,sand,700,800,tons,riverstone,75,4,0,40,8,cloudy,low,easy phase,structure,15-01-2024
+P004,metro bridge,bridge,large,hyderabad,03-01-2024,02-01-2026,20000,bricks,500,600,tons,buildpro,80,7,1,40,8,cloudy,low,demand rising,structure,15-01-2024
+P005,metro bridge,bridge,large,hyderabad,04-01-2024,03-01-2026,20000,cement,1400,1500,tons,ultratech,92,5,0,42,8,sunny,medium,,structure,15-03-2024
+P006,metro bridge,bridge,large,hyderabad,05-01-2024,04-01-2026,20000,steel,1100,1150,tons,tata steel,87,6,2,42,8,humid,medium,,structure,15-03-2024
+P007,metro bridge,bridge,large,hyderabad,06-01-2024,05-01-2026,20000,sand,850,900,tons,riverstone,75,4,0,42,8,humid,low,,finishing,15-03-2024
+P008,metro bridge,bridge,large,hyderabad,07-01-2024,06-01-2026,20000,bricks,600,700,tons,buildpro,80,7,1,42,8,humid,low,,finishing,15-06-2024
+P009,metro bridge,bridge,large,hyderabad,08-01-2024,07-01-2026,20000,cement,1550,1600,tons,ultra tech,92,5,1,45,8,rainy,medium,,finishing,15-06-2024
+P0010,metro bridge,bridge,large,hyderabad,09-01-2024,08-01-2026,20000,steel,1250,1300,tons,tata steel,87,6,2,45,8,rainy,medium,,finishing,15-09-2024
+P0011,metro bridge,bridge,large,hyderabad,10-01-2024,09-01-2026,20000,sand,900,950,tons,riverstone,75,5,1,45,8,rainy,low,,completion,15-09-2024
+P0012,metro bridge,bridge,large,hyderabad,11-01-2024,10-01-2026,20000,bricks,700,750,tons,buildpro,80,7,2,45,8,sunny,low,,completion,15-12-2024
+P0013,metro bridge,bridge,large,hyderabad,12-01-2024,11-01-2026,20000,cement,1700,1750,tons,ultra tech,92,5,0,48,8,sunny,medium,,completion,15-12-2024

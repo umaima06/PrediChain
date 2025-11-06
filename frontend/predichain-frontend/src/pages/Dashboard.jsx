@@ -6,7 +6,7 @@ import MetricCard from "../components/MetricCard";
 import MaterialForecastChart from "../components/MaterialForecastChart";
 import RecommendationPanel from "../components/RecommendationPanel";
 import HistoricalVsForecastChart from "../components/HistoricalVsForecastChart";
-import MaterialTable from "../components/MaterialTable";
+import MaterialDashboard from "../components/MaterialDashboard";
 import { getDashboardData } from "../services/dashboardService";
 import { useParams, useNavigate } from "react-router-dom";
 import MapPreview from "../components/MapPreview";
@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [recommendationsData, setRecommendationsData] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [historicalData, setHistoricalData] = useState([]);
 
   // ✅ Fetch project info from Firestore
   useEffect(() => {
@@ -100,6 +101,9 @@ useEffect(() => {
       console.log("🚀 Sending dashboard payload:", payload);
 
       const result = await getDashboardData(payload);
+      setForecastData(result.forecast || []);
+setRecommendationsData(result.recommendations || []);
+setHistoricalData(result.historical || []); // ✅ new
 
       // ✅ Backend will return array: forecast[] + recommendations[]
       const forecasts = (result.forecast || []).map(f => ({
@@ -112,8 +116,8 @@ useEffect(() => {
         material: r.material
       }));
 
-      setForecastData(forecasts);
-      setRecommendationsData(recs);
+      // setForecastData(forecasts);
+      // setRecommendationsData(recs);
 
     } catch (err) {
       console.error("🔥 Dashboard ML Multi-Material Error:", err);
@@ -262,13 +266,26 @@ const leadTime = selectedMaterial === "All"
     progress={50}
     gradientClass="bg-gradient-to-br from-[#5f2c82] to-[#49a09d]"
   />
-
 </div>
-    
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <MaterialForecastChart forecastData={forecastData} />
-          <HistoricalVsForecastChart forecastData={forecastData} />
+
+
+<div className="mt-10">
+  {/* Full-width Material Forecast */}
+  <MaterialForecastChart
+    forecastData={forecastData}
+    selectedMaterial={selectedMaterial}
+  />
+
+  {/* Recommendation Panel below */}
+  <div className="mt-8">
+    <RecommendationPanel recommendationsData={recommendationsData} />
+  </div>
+</div>
+
+<HistoricalVsForecastChart
+  forecastData={forecastData}
+  historicalData={historicalData} // <- use this directly
+/>
           
           {/* 📍 Google Map Preview Section */}
           <div className="bg-[#1e293b] p-4 rounded-xl shadow-md">
@@ -303,25 +320,23 @@ const leadTime = selectedMaterial === "All"
 
 
     {/* ✅ Material table same width as charts */}
-    <MaterialTable
-      materials={forecastData.map(item => {
-        const forecast = item.forecasted_demand ?? item.forecast ?? 0;
-        const inventory = projectInfo.current_inventory ?? 0;
+  <MaterialDashboard
+  materials={forecastData.map(item => {
+    const matInfo = projectInfo.materials?.find(m => m.material === item.material) || {};
 
-        return {
-          material: item.material || "Unknown",
-          forecast,
-          inventory,
-          supplier: projectInfo.supplierName || "N/A",
-          leadTime: projectInfo.lead_time_days || "-",
-          action: forecast > inventory ? "urgent" : "ok",
-        };
-      })}
-    />
-  </div>
+    // Normalize historical quantity from backend
+    const historicalTotal = item.quantity ?? item.historical_quantity ?? 0;
 
-  <RecommendationPanel recommendationsData={recommendationsData} />
-</div>
+    return {
+      material: item.material || "Unknown",
+      historical_total: historicalTotal,
+      forecasted_demand: item.forecasted_demand ?? item.forecast ?? item.yhat ?? 0,
+      current_inventory: matInfo.current_inventory ?? 0,
+      supplier: matInfo.supplierName ?? "N/A",
+      leadTime: matInfo.lead_time_days ?? 0,
+    };
+  })}
+/>
     </Layout>
   );
 };

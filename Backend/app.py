@@ -479,7 +479,6 @@ def dashboard_data(
     startDate: str = Form(""),
     endDate: str = Form("")
 ):
-
     filepath = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="CSV file not found")
@@ -497,17 +496,16 @@ def dashboard_data(
         print("❌ JSON parse fail, fallback")
         material_list = [materials]
 
-    # ✅ initialize outside loop
     all_forecasts = []
     all_recs = []
     all_hist = []
 
-    # ✅ loop through materials
+    # --- loop through materials ---
     for matObj in material_list:
         mat = matObj["material"] if isinstance(matObj, dict) else matObj
         print(f"\n📦 Dashboard: processing material: {mat}")
 
-        # Forecast
+        # --- Forecast ---
         try:
             forecast_df = generate_forecast(df_hist, mat, horizon_months)
         except Exception as e:
@@ -533,7 +531,7 @@ def dashboard_data(
             "forecasted_demand": forecast_df['yhat']
         })
 
-        # Recommendations
+        # --- Recommendations ---
         try:
             rec_df = generate_procurement_recommendations(
                 forecast_df=forecast_df,
@@ -547,30 +545,42 @@ def dashboard_data(
         all_forecasts += forecast_df.to_dict(orient="records")
         all_recs += rec_df.to_dict(orient="records")
 
-        # Historical usage
+        # --- Historical aggregation ---
         try:
-            if (
-                'Date_of_Materail_Usage' in df_hist.columns 
-                and 'Quantity_Used' in df_hist.columns
-                and 'Material_Name' in df_hist.columns
-            ):
-                df_hist['Date_of_Materail_Usage'] = pd.to_datetime(df_hist['Date_of_Materail_Usage'])
-                hist_monthly = (
-                    df_hist[df_hist['Material_Name'].str.lower() == mat.lower()]
-                    .set_index('Date_of_Materail_Usage')
-                    .resample('M')['Quantity_Used'].sum().reset_index()
-                )
-                hist_monthly.rename(columns={'Date_of_Materail_Usage': 'date', 'Quantity_Used': 'quantity'}, inplace=True)
-                all_hist += hist_monthly.to_dict(orient='records')
-        except Exception:
-            pass
+            df_hist.columns = [c.strip() for c in df_hist.columns]
 
-    # ✅ Summary / advice section remains outside loop
+            # Standardize date column
+            if "Date_of_Materail_Usage" in df_hist.columns:
+                df_hist.rename(columns={"Date_of_Materail_Usage": "date"}, inplace=True)
+            elif "Date_of_Material_Usage" in df_hist.columns:
+                df_hist.rename(columns={"Date_of_Material_Usage": "date"}, inplace=True)
+
+            # Convert date & quantity
+            df_hist["date"] = pd.to_datetime(df_hist["date"], errors='coerce')
+            df_hist["Quantity_Used"] = pd.to_numeric(df_hist["Quantity_Used"], errors='coerce').fillna(0)
+
+            # Clean material names
+            df_hist["Material_Name"] = df_hist["Material_Name"].astype(str).str.strip().str.lower()
+
+            # Filter for material
+            mat_lower = mat.strip().lower()
+            df_mat = df_hist[df_hist["Material_Name"] == mat_lower]
+            print(f"Material '{mat_lower}' filtered rows: {len(df_mat)}")
+
+            # Aggregate monthly
+            hist_monthly = df_mat.set_index("date").resample('M')["Quantity_Used"].sum().reset_index()
+            hist_monthly.rename(columns={"Quantity_Used": "quantity"}, inplace=True)
+            all_hist += hist_monthly.to_dict(orient='records')
+
+        except Exception as e:
+            print("❌ Historical aggregation failed for", mat, e)
+            all_hist += []
+
+    # --- Summary / advice ---
     total_forecast = sum([row["yhat"] for row in all_forecasts]) if all_forecasts else 0
-
-    advice = []
     next_month_forecast = float(all_forecasts[0]["yhat"]) if all_forecasts else 0
 
+    advice = []
     if current_inventory < next_month_forecast * 0.5:
         advice.append("Inventory low — order soon.")
     if supplierReliability < 80:
