@@ -7,3 +7,5 @@ scikit-learn
 python-multipart
 firebase-admin
 python-dotenv
+requests
+joblib

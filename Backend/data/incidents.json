@@ -1,0 +1,386 @@
+[
+  {
+    "timestamp": 1762480765,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762481284,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762484166,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762484649,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762488585,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762488962,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762489124,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762490158,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762494674,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762494839,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762495033,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762495180,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762495265,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762495416,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762495559,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  },
+  {
+    "timestamp": 1762495670,
+    "project": {
+      "projectName": "Seaside Bridge Project",
+      "location": "Nagpada, Mumbai",
+      "latitude": 19.0461,
+      "longitude": 72.8559,
+      "phase": "slabbing",
+      "structure_type": "bridge",
+      "materials": [
+        "cement",
+        "steel",
+        "sand"
+      ]
+    },
+    "loss_report": {
+      "description": "concrete washed away due to heavy rain",
+      "approx_cost": 45000,
+      "delay_days": 2
+    },
+    "user": {
+      "email": "site.manager@predichain.ai"
+    }
+  }
+]

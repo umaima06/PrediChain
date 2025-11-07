@@ -1,119 +1,3 @@
-# # main FastAPI app
-# from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-# from fastapi.responses import JSONResponse
-# import pandas as pd
-# import os
-# from ml.forecast import generate_forecast
-# from ml.recommendation import generate_procurement_recommendations
-
-# app = FastAPI(title="PrediChain Backend", version="1.0")
-
-# UPLOAD_DIR = "data/uploads"
-# os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# @app.get("/health")
-# def health_check():
-#     return {"status": "ok"}
-
-# @app.post("/upload-data")
-# async def upload_data(file: UploadFile = File(...)):
-#     filepath = os.path.join(UPLOAD_DIR, file.filename)
-#     with open(filepath, "wb") as f:
-#         f.write(await file.read())
-#     return {"message": "File uploaded successfully", "filename": file.filename}
-
-# @app.post("/forecast")
-# def forecast(filename: str = Form(...), material: str = Form(...), horizon_months: int = Form(6)):
-#     filepath = os.path.join(UPLOAD_DIR, filename)
-#     if not os.path.exists(filepath):
-#         return JSONResponse(status_code=404, content={"error": "File not found"})
-#     try:
-#         # ULTIMATE FIX: 
-#         # 1. Use engine='python' for better error handling (though slower).
-#         # 2. Add skipinitialspace=True to clean up header whitespace.
-#         df = pd.read_csv(filepath, sep=',', skipinitialspace=True, engine='python') 
-        
-#         # Remove any leading/trailing whitespace from column names just in case
-#         df.columns = df.columns.str.strip()
-        
-#         # FIX: Drop any column starting with 'Unnamed:' (This is still necessary)
-#         df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
-
-#         forecast_df = generate_forecast(df, material, horizon_months)
-#         return forecast_df.to_dict(orient="records")
-#     except Exception as e:
-#         return JSONResponse(status_code=500, content={"error": str(e)})
-
-# @app.post("/recommendation") 
-# def recommend_procurement(
-#     filename: str = Form(...), 
-#     material: str = Form(...), 
-#     horizon_months: int = Form(6),
-#     lead_time_days: int = Form(10), 
-#     current_inventory: float = Form(0.0) 
-# ):
-#     # ... (filepath check remains the same) ...
-        
-#     try:
-#         # Step 1: Read the data
-#         # ULTIMATE FIX: 
-#         df = pd.read_csv(filepath, sep=',', skipinitialspace=True, engine='python')
-        
-#         # Remove any leading/trailing whitespace from column names just in case
-#         df.columns = df.columns.str.strip()
-        
-#         # FIX: Drop any column starting with 'Unnamed:' 
-#         df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
-        
-#         # Step 2: Generate the monthly forecast (using the existing core logic)
-#         forecast_df = generate_forecast(df, material, horizon_months)
-#         return forecast_df.to_dict(orient="records")
-#     except Exception as e:
-#         return JSONResponse(status_code=500, content={"error": str(e)})
-
-# @app.post("/recommendation") 
-# def recommend_procurement(
-#     filename: str = Form(...), 
-#     material: str = Form(...), 
-#     horizon_months: int = Form(6),
-#     lead_time_days: int = Form(10), 
-#     current_inventory: float = Form(0.0) 
-# ):
-#     """
-#     Generates material demand forecast and then provides actionable procurement recommendations.
-#     """
-#     filepath = os.path.join(UPLOAD_DIR, filename)
-#     if not os.path.exists(filepath):
-#         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
-        
-#     try:
-#         # Step 1: Read the data
-#         df = pd.read_csv(filepath, sep=',')
-        
-#         # FIX: Drop any column starting with 'Unnamed:' (the extra index column)
-#         df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
-        
-#         # Step 2: Generate the monthly forecast (using the existing core logic)
-#         forecast_df = generate_forecast(df, material, horizon_months)
-        
-#         # Step 3: Generate the procurement recommendation
-#         recommendation_df = generate_procurement_recommendations(
-#             forecast_df, 
-#             lead_time_days=lead_time_days, 
-#             current_inventory=current_inventory
-#         )
-        
-#         return recommendation_df.to_dict(orient="records")
-        
-#     except ValueError as ve:
-#         # Catch validation errors from utils/forecast
-#         raise HTTPException(status_code=400, detail=str(ve))
-#     except Exception as e:
-#         # Catch any other unexpected errors
-#         print(f"An unexpected error occurred: {e}")
-#         raise HTTPException(status_code=500, detail=f"Internal server error during recommendation generation: {e}")
-
-
 # backend/app.py
 """
 PrediChain backend main FastAPI app.
@@ -137,16 +21,19 @@ import pandas as pd
 import os
 import json
 from typing import Optional
-# import FullMap from "frontend/predichain-frontend/src/pages/FullMap";
-# import FullMap from "./pages/FullMap";
+from dotenv import load_dotenv
+load_dotenv()
 
 # local ML modules (keep your existing functions)
 from ml.forecast import generate_forecast
 from ml.recommendation import generate_procurement_recommendations
-
+# from ml.alert_engine import predict_risk, predict_recovery_action
+from ml.alert_engine import predict_risk, generate_recovery_plan, log_incident, ai_dynamic_risk_analysis
+from fastapi import Body
 # Firebase admin token verification helper (must exist in backend/firebase_admin_auth.py)
 from firebase_admin_auth import verify_firebase_token
-
+import logging 
+logging.basicConfig(level=logging.INFO)
 # --- App init ---
 app = FastAPI(title="PrediChain Backend", version="1.0")
 
@@ -188,6 +75,12 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return decoded
 
+@app.middleware("http")
+async def log_requests(request, call_next):
+    print(f"➡️ {request.method} {request.url}")
+    response = await call_next(request)
+    print(f"⬅️ {response.status_code}")
+    return response
 # --- Health ---
 @app.get("/health")
 def health_check():
@@ -305,11 +198,12 @@ def forecast(
         return forecast_df.to_dict(orient="records")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 # --- Recommendation (current project inputs + forecast) ---
 @app.post("/recommendation")
 def recommend_procurement(
     filename: str = Form(...),
-    material: str = Form(...),
+    materials: str = Form("[]"),  # JSON string list
     horizon_months: int = Form(6),
     lead_time_days: int = Form(10),
     current_inventory: float = Form(0.0),
@@ -326,13 +220,6 @@ def recommend_procurement(
     startDate: str = Form(""),
     endDate: str = Form("")
 ):
-    """
-    Use historical CSV + current project inputs to:
-      - compute forecast (via generate_forecast)
-      - prepare per-month project info
-      - compute procurement recommendations (via generate_procurement_recommendations)
-    Returns: { forecast: [...], recommendations: [...] }
-    """
     filepath = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="CSV file not found")
@@ -342,50 +229,74 @@ def recommend_procurement(
 
     print("=== Debug: /recommendation called ===")
     print("Filename:", filename)
-    print("Material:", material)
-    print("File exists:", os.path.exists(filepath))
-    print("Columns in CSV:", df_hist.columns.tolist())
+    print("Raw Material Field:", materials)
+
+    # ✅ Parse materials JSON
+    try:
+        material_list = json.loads(materials)
+    except:
+        print("❌ JSON parse fail, fallback to single material")
+        material_list = [{"material": materials}]
+
+    print("Parsed materials:", material_list)
+
+    all_forecasts = []
+    all_recs = []
 
     try:
-        # Forecast using historical CSV
-        forecast_df = generate_forecast(df_hist, material, horizon_months)
+        for matObj in material_list:
+            mat = matObj["material"]
+            hm = int(matObj.get("horizon_months", horizon_months))
+            ltd = int(matObj.get("lead_time_days", lead_time_days))
+            inv = float(matObj.get("current_inventory", current_inventory))
+            sr = float(matObj.get("supplierReliability", supplierReliability))
+            dtd = float(matObj.get("deliveryTimeDays", deliveryTimeDays))
+            cts = int(matObj.get("contractorTeamSize", contractorTeamSize))
+            pb = float(matObj.get("projectBudget", projectBudget))
 
-        # Build current project data broadcast for recommendations
-        current_project_data = pd.DataFrame({
-            "material": [material] * len(forecast_df),
-            "forecast_date": forecast_df['forecast_date'],
-            "lead_time_days": [lead_time_days] * len(forecast_df),
-            "current_inventory": [current_inventory] * len(forecast_df),
-            "supplier_reliability": [supplierReliability] * len(forecast_df),
-            "delivery_time_days": [deliveryTimeDays] * len(forecast_df),
-            "contractor_team_size": [contractorTeamSize] * len(forecast_df),
-            "project_budget": [projectBudget] * len(forecast_df),
-            "weather": [weather] * len(forecast_df),
-            "region_risk": [region_risk] * len(forecast_df),
-            "notes": [notes] * len(forecast_df),
-            "project_name": [projectName] * len(forecast_df),
-            "project_type": [projectType] * len(forecast_df),
-            "location": [location] * len(forecast_df),
-            "start_date": [startDate] * len(forecast_df),
-            "end_date": [endDate] * len(forecast_df),
-            "forecasted_demand": forecast_df['yhat']
-        })
+            print(f"\n📦 Running forecast for material: {mat}")
 
-        recommendation_df = generate_procurement_recommendations(
-           forecast_df=forecast_df,
-           current_project_data=current_project_data,   # ✅ include this
-           lead_time_days=lead_time_days,
-           current_inventory=current_inventory
-        )
+            forecast_df = generate_forecast(df_hist, mat, hm)
 
+            current_project_data = pd.DataFrame({
+                "material": [mat] * len(forecast_df),
+                "forecast_date": forecast_df['forecast_date'],
+                "lead_time_days": [ltd] * len(forecast_df),
+                "current_inventory": [inv] * len(forecast_df),
+                "supplier_reliability": [sr] * len(forecast_df),
+                "delivery_time_days": [dtd] * len(forecast_df),
+                "contractor_team_size": [cts] * len(forecast_df),
+                "project_budget": [pb] * len(forecast_df),
+                "weather": [weather] * len(forecast_df),
+                "region_risk": [region_risk] * len(forecast_df),
+                "notes": [notes] * len(forecast_df),
+                "project_name": [projectName] * len(forecast_df),
+                "project_type": [projectType] * len(forecast_df),
+                "location": [location] * len(forecast_df),
+                "start_date": [startDate] * len(forecast_df),
+                "end_date": [endDate] * len(forecast_df),
+                "forecasted_demand": forecast_df['yhat']
+            })
+
+            rec_df = generate_procurement_recommendations(
+                forecast_df=forecast_df,
+                current_project_data=current_project_data,
+                lead_time_days=ltd,
+                current_inventory=inv
+            )
+
+            all_forecasts += forecast_df.to_dict(orient="records")
+            all_recs += rec_df.to_dict(orient="records")
+
+        # ✅ return must be after loop & still inside try
         return {
-            "forecast": forecast_df.to_dict(orient="records"),
-            "recommendations": recommendation_df.to_dict(orient="records")
+            "forecast": all_forecasts,
+            "recommendations": all_recs
         }
 
     except Exception as e:
         import traceback
-        print("🔥🔥 ERROR IN /recommendATION 🔥🔥")
+        print("🔥🔥 ERROR IN /recommendation 🔥🔥")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -437,7 +348,7 @@ def historical_forecast(
 @app.post("/dashboard-data")
 def dashboard_data(
     filename: str = Form(...),
-    material: str = Form(...),
+    materials: str = Form("[]"),
     horizon_months: int = Form(6),
     lead_time_days: int = Form(10),
     current_inventory: float = Form(0.0),
@@ -454,14 +365,7 @@ def dashboard_data(
     startDate: str = Form(""),
     endDate: str = Form("")
 ):
-    """
-    Returns combined payload used by the frontend dashboard:
-      - forecast (monthly)
-      - recommendations (rows)
-      - historical (monthly aggregation)
-      - summary metrics for top cards
-      - advice (human-readable suggestions)
-    """
+
     filepath = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="CSV file not found")
@@ -469,76 +373,98 @@ def dashboard_data(
     df_hist = pd.read_csv(filepath)
     df_hist.columns = [c.strip() for c in df_hist.columns]
 
-    # Forecast
-    try:
-        forecast_df = generate_forecast(df_hist, material, horizon_months)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Forecast failed: {e}")
-
-    # Recommendations using the broadcast current project data
-    current_project_data = pd.DataFrame({
-        "material": [material] * len(forecast_df),
-        "forecast_date": forecast_df['forecast_date'],
-        "lead_time_days": [lead_time_days] * len(forecast_df),
-        "current_inventory": [current_inventory] * len(forecast_df),
-        "supplier_reliability": [supplierReliability] * len(forecast_df),
-        "delivery_time_days": [deliveryTimeDays] * len(forecast_df),
-        "contractor_team_size": [contractorTeamSize] * len(forecast_df),
-        "project_budget": [projectBudget] * len(forecast_df),
-        "weather": [weather] * len(forecast_df),
-        "region_risk": [region_risk] * len(forecast_df),
-        "notes": [notes] * len(forecast_df),
-        "project_name": [projectName] * len(forecast_df),
-        "project_type": [projectType] * len(forecast_df),
-        "location": [location] * len(forecast_df),
-        "start_date": [startDate] * len(forecast_df),
-        "end_date": [endDate] * len(forecast_df),
-        "forecasted_demand": forecast_df['yhat']
-    })
+    print("=== Debug: /dashboard-data called ===")
+    print("Filename:", filename)
+    print("Raw material field:", materials)
 
     try:
-        rec_df = generate_procurement_recommendations(
-        forecast_df=forecast_df,         # use actual forecast
-        lead_time_days=lead_time_days,
-        current_inventory=current_inventory,
-        current_project_data=current_project_data  # pass project context
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Recommendation generation failed: {e}")
+        material_list = json.loads(materials)
+    except:
+        print("❌ JSON parse fail, fallback")
+        material_list = [materials]
 
-    # Historical aggregation (optional)
-    hist_agg = []
-    try:
-        if 'Date_of_Materail_Usage' in df_hist.columns and 'Quantity_Used' in df_hist.columns:
-            df_hist['Date_of_Materail_Usage'] = pd.to_datetime(df_hist['Date_of_Materail_Usage'])
-            hist_monthly = (
-                df_hist[df_hist['Material_Name'].str.lower() == material.lower()]
-                .set_index('Date_of_Materail_Usage')
-                .resample('M')['Quantity_Used'].sum().reset_index()
+    # ✅ initialize outside loop
+    all_forecasts = []
+    all_recs = []
+    all_hist = []
+
+    # ✅ loop through materials
+    for matObj in material_list:
+        mat = matObj["material"] if isinstance(matObj, dict) else matObj
+        print(f"\n📦 Dashboard: processing material: {mat}")
+
+        # Forecast
+        try:
+            forecast_df = generate_forecast(df_hist, mat, horizon_months)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Forecast failed: {e}")
+
+        current_project_data = pd.DataFrame({
+            "material": [mat] * len(forecast_df),
+            "forecast_date": forecast_df['forecast_date'],
+            "lead_time_days": [lead_time_days] * len(forecast_df),
+            "current_inventory": [current_inventory] * len(forecast_df),
+            "supplier_reliability": [supplierReliability] * len(forecast_df),
+            "delivery_time_days": [deliveryTimeDays] * len(forecast_df),
+            "contractor_team_size": [contractorTeamSize] * len(forecast_df),
+            "project_budget": [projectBudget] * len(forecast_df),
+            "weather": [weather] * len(forecast_df),
+            "region_risk": [region_risk] * len(forecast_df),
+            "notes": [notes] * len(forecast_df),
+            "project_name": [projectName] * len(forecast_df),
+            "project_type": [projectType] * len(forecast_df),
+            "location": [location] * len(forecast_df),
+            "start_date": [startDate] * len(forecast_df),
+            "end_date": [endDate] * len(forecast_df),
+            "forecasted_demand": forecast_df['yhat']
+        })
+
+        # Recommendations
+        try:
+            rec_df = generate_procurement_recommendations(
+                forecast_df=forecast_df,
+                current_project_data=current_project_data,
+                lead_time_days=lead_time_days,
+                current_inventory=current_inventory
             )
-            hist_monthly.rename(columns={'Date_of_Materail_Usage': 'date', 'Quantity_Used': 'quantity'}, inplace=True)
-            hist_agg = hist_monthly.to_dict(orient='records')
-    except Exception:
-        hist_agg = []
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Recommendation generation failed: {e}")
 
-    # Simple rule-based AI-style textual advice (expandable later)
+        all_forecasts += forecast_df.to_dict(orient="records")
+        all_recs += rec_df.to_dict(orient="records")
+
+        # Historical usage
+        try:
+            if (
+                'Date_of_Materail_Usage' in df_hist.columns 
+                and 'Quantity_Used' in df_hist.columns
+                and 'Material_Name' in df_hist.columns
+            ):
+                df_hist['Date_of_Materail_Usage'] = pd.to_datetime(df_hist['Date_of_Materail_Usage'])
+                hist_monthly = (
+                    df_hist[df_hist['Material_Name'].str.lower() == mat.lower()]
+                    .set_index('Date_of_Materail_Usage')
+                    .resample('M')['Quantity_Used'].sum().reset_index()
+                )
+                hist_monthly.rename(columns={'Date_of_Materail_Usage': 'date', 'Quantity_Used': 'quantity'}, inplace=True)
+                all_hist += hist_monthly.to_dict(orient='records')
+        except Exception:
+            pass
+
+    # ✅ Summary / advice section remains outside loop
+    total_forecast = sum([row["yhat"] for row in all_forecasts]) if all_forecasts else 0
+
     advice = []
-    try:
-        next_month_forecast = float(forecast_df['yhat'].iloc[0]) if not forecast_df.empty else 0
-    except Exception:
-        next_month_forecast = 0
+    next_month_forecast = float(all_forecasts[0]["yhat"]) if all_forecasts else 0
 
     if current_inventory < next_month_forecast * 0.5:
-        advice.append("Inventory low relative to next month's forecast — consider ordering now.")
+        advice.append("Inventory low — order soon.")
     if supplierReliability < 80:
-        advice.append("Supplier reliability below 80% — consider adding safety stock or alternate supplier.")
+        advice.append("Supplier reliability below 80% — add safety stock.")
     if str(weather).lower() in ['rainy', 'humid'] or str(region_risk).lower() == 'high':
-        advice.append("Environmental risk high — factor in delivery delays and buffer stock.")
+        advice.append("Weather/region risk high — keep buffer stock.")
     if not advice:
-        advice.append("No immediate issues detected. Monitor monthly usage and supplier updates.")
-
-    # Summary metrics for top cards
-    total_forecast = float(forecast_df['yhat'].sum()) if not forecast_df.empty else 0
+        advice.append("Looks good. Monitor monthly usage.")
 
     summary = {
         "total_forecast": total_forecast,
@@ -549,14 +475,156 @@ def dashboard_data(
     }
 
     return {
-        "forecast": forecast_df.to_dict(orient="records"),
-        "recommendations": rec_df.to_dict(orient="records"),
-        "historical": hist_agg,
+        "forecast": all_forecasts,
+        "recommendations": all_recs,
+        "historical": all_hist,
         "summary": summary,
         "advice": advice
     }
 
-# Simple root
-@app.get("/")
-def root():
-    return {"message": "Welcome to PrediChain Backend", "status": "running"}
+@app.post("/smart-alert")
+def smart_alert(
+    projectName: str = Form(...),
+    location: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    projectPhase: str = Form(...),
+    structureType: str = Form(...),
+    materials: str = Form("[]")
+):
+    try:
+        import json
+        materials_list = json.loads(materials) if materials else []
+        project = {
+            "projectName": projectName,
+            "location": location,
+            "latitude": latitude,
+            "longitude": longitude,
+            "phase": projectPhase,
+            "structure_type": structureType,
+            "materials": materials_list
+        }
+        result = predict_risk(project)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+    
+# @app.post("/recovery-steps")
+# def recovery_steps(
+#     projectPhase: str = Form(...),
+#     structureType: str = Form(...),
+#     riskLevel: str = Form(...)
+# ):
+#     """
+#     Provides recommended recovery steps when project work is affected.
+#     """
+#     try:
+#         tips = recovery_guidance(projectPhase, structureType, riskLevel)
+#         return {"phase": projectPhase, "structure": structureType, "tips": tips}
+#     except Exception as e:
+#         return {"error": str(e)}
+    
+# @app.post("/recovery-smart")
+# def recovery_smart(
+#     projectName: str = Form(...),
+#     location: str = Form(...),
+#     latitude: float = Form(...),
+#     longitude: float = Form(...),
+#     projectPhase: str = Form(...),
+#     structureType: str = Form(...),
+#     materials: str = Form("[]"),
+#     riskLevel: str = Form(...),
+# ):
+#     """
+#     Smart recovery guidance endpoint.
+#     Combines ML-based recovery advisor + rule-based fallback for multi-phase civil projects.
+#     Automatically uses latest weather context.
+#     """
+#     try:
+#         import json
+
+#         materials_list = json.loads(materials) if materials else []
+#         project = {
+#             "projectName": projectName,
+#             "location": location,
+#             "latitude": latitude,
+#             "longitude": longitude,
+#             "phase": projectPhase,
+#             "structure_type": structureType,
+#             "materials": materials_list,
+#         }
+
+#         # 🔁 Intelligent recovery logic
+#         tips = predict_recovery_action(project, riskLevel)
+
+#         return {
+#             "project": projectName,
+#             "phase": projectPhase,
+#             "structure": structureType,
+#             "risk_level": riskLevel,
+#             "tips": tips,
+#         }
+
+#     except Exception as e:
+#         import traceback
+#         traceback.print_exc()
+#         return {"error": f"Recovery smart endpoint failed: {str(e)}"}
+
+@app.post("/smart-alert-v3")
+def smart_alert_v3(payload: dict = Body(...)):
+    """
+    Dashboard auto alert endpoint.
+    Expects:
+      {
+        "projectName": "",
+        "location": "",
+        "latitude": 0.0,
+        "longitude": 0.0,
+        "phase": "",
+        "structure_type": "",
+        "materials": []
+      }
+    """
+    try:
+        result = predict_risk(payload)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/smart-ai-alert")
+def smart_ai_alert(payload: dict = Body(...)):
+    """
+    Fully adaptive Gemini-powered project analysis.
+    Optionally accepts aggregated CSV insights too.
+    """
+    try:
+        project = payload.get("project", payload)
+        csv_summary = payload.get("csv_summary", {})
+        result = ai_dynamic_risk_analysis(project, csv_summary)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/recovery-smart-v3")
+def recovery_smart_v3(payload: dict = Body(...)):
+    try:
+        project = payload.get("project", {})
+        loss_report = payload.get("loss_report", {})
+        user = payload.get("user", {})
+        csv_summary = payload.get("csv_summary", {})
+        # 1) First, call heuristic recovery (existing)
+        tips = generate_recovery_plan(project, loss_report)
+
+        # 2) Ask AI for extra recovery plan using CSV/context
+        ai_out = ai_dynamic_risk_analysis(project, csv_summary)
+        # merge suggestions (AI may be richer)
+        merged = {
+            "heuristic_tips": tips,
+            "ai_insights": ai_out,
+        }
+        log_incident(project, loss_report, user)
+        return {"tips": merged["heuristic_tips"], "ai_insights": merged["ai_insights"], "logged": True}
+    except Exception as e:
+        return {"error": str(e)}
+
+    
