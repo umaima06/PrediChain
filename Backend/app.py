@@ -242,6 +242,7 @@ def recommend_procurement(
 
     all_forecasts = []
     all_recs = []
+    all_bulk_orders = []
 
     try:
         for matObj in material_list:
@@ -278,20 +279,32 @@ def recommend_procurement(
                 "forecasted_demand": forecast_df['yhat']
             })
 
-            rec_df = generate_procurement_recommendations(
+            # --- Handle possible tuple return from generate_procurement_recommendations ---
+            rec_out = generate_procurement_recommendations(
                 forecast_df=forecast_df,
                 current_project_data=current_project_data,
                 lead_time_days=ltd,
                 current_inventory=inv
             )
 
+            if isinstance(rec_out, (tuple, list)):
+                rec_df = rec_out[0] if rec_out[0] is not None else pd.DataFrame()
+                bulk_orders_df = rec_out[1] if len(rec_out) > 1 and rec_out[1] is not None else pd.DataFrame()
+            else:
+                rec_df = rec_out if isinstance(rec_out, pd.DataFrame) else pd.DataFrame(rec_out)
+                bulk_orders_df = pd.DataFrame()
+
             all_forecasts += forecast_df.to_dict(orient="records")
             all_recs += rec_df.to_dict(orient="records")
+
+            if not bulk_orders_df.empty:
+                all_bulk_orders += bulk_orders_df.to_dict(orient="records")
 
         # ✅ return must be after loop & still inside try
         return {
             "forecast": all_forecasts,
-            "recommendations": all_recs
+            "recommendations": all_recs,
+            "bulk_orders": all_bulk_orders
         }
 
     except Exception as e:
@@ -619,12 +632,12 @@ def dashboard_data(
 
     print("🔥 Feature Importance Computed:", feature_importance)
     # ✅ Return regular FastAPI dict (not jsonify!)
+    advice = [] #placeholder
     return {
         "forecast": all_forecasts,
         "recommendations": all_recs,
         "bulk_orders": all_bulk_orders,
         "historical": all_hist,
-<<<<<<< HEAD
         "summary": summary,
         "advice": advice
     }
@@ -775,7 +788,3 @@ def recovery_smart_v3(payload: dict = Body(...)):
         return {"error": str(e)}
 
     
-=======
-        "summary": summary
-        }
->>>>>>> abb8366 (added AI insights panel + enhanced MaterialDashboard with bulk orders, summaries, and normalized forecast data)
