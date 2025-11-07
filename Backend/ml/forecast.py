@@ -70,13 +70,20 @@ def generate_forecast(df: pd.DataFrame, material: str, horizon_months: int = 6):
     forecast = model.predict(future)
 
     # 📅 Aggregate to monthly
-    forecast_out = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(horizon_months * 30)
+    forecast_out = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
     forecast_out['ds'] = pd.to_datetime(forecast_out['ds'])
-    monthly_forecast = forecast_out.set_index('ds').resample('M').agg({
-        'yhat': 'sum',
-        'yhat_lower': 'mean',
-        'yhat_upper': 'mean'
-    }).reset_index()
+
+# Aggregate properly from the end of your dataset
+    last_date = df_prophet['ds'].max()
+    future_months = pd.date_range(last_date, periods=horizon_months, freq='M')
+
+    monthly_forecast = (
+        forecast_out.set_index('ds')
+        .resample('M')
+        .sum()
+        .loc[future_months]
+        .reset_index()
+        )
     monthly_forecast["material"] = material
     monthly_forecast.rename(columns={'ds': 'forecast_date'}, inplace=True)
 

@@ -1,203 +1,231 @@
-// src/components/MaterialForecastChart.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
-import { Line } from "react-chartjs-2";
+
+import React, { useMemo } from "react";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
+LineChart,
+Line,
+XAxis,
+YAxis,
+Tooltip,
+CartesianGrid,
+ResponsiveContainer,
+} from "recharts";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+const MaterialForecastChart = ({ forecastData, selectedMaterial }) => {
+// 🧠 Step 1: Clean and format data
+const filteredData = useMemo(() => {
+if (!forecastData || forecastData.length === 0) return [];
 
-/**
- * Props:
- * - forecastData (optional): array of forecast records from backend (forecast_date, yhat, material)
- * - projectData (optional): object with filename, material, horizon_months...
- *
- * Either forecastData OR projectData should be provided. If projectData is provided but
- * forecastData is missing, this component will call backend /forecast endpoint.
- */
-const MaterialForecastChart = ({ forecastData, projectData }) => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const data =  
+  selectedMaterial === "All"  
+    ? forecastData  
+    : forecastData.filter((f) => f.material === selectedMaterial);  
 
-  // helper to convert backend array -> chart data
-  const buildChartFromRows = (rows) => {
-    if (!rows || rows.length === 0) return null;
-    // rows might use different keys, normalize:
-    const normalized = rows.map((r) => ({
-      date: r.forecast_date ? new Date(r.forecast_date) : new Date(r.ds || r.date),
-      value: r.yhat ?? r.forecasted_demand ?? r.quantity ?? 0,
-      material: r.material ?? r.Material_Name ?? (projectData && projectData.material),
-    }));
+const grouped = {};  
+data.forEach((item) => {  
+  const rawDate = item.forecast_date || item.date;  
+  const forecast = Number(  
+    item.yhat || item.forecasted_demand || item.forecast || 0  
+  );  
+  if (!rawDate) return;  
 
-    // sort by date
-    normalized.sort((a, b) => a.date - b.date);
+  // Convert to standardized month-year format  
+  const month = new Date(rawDate).toISOString().slice(0, 7); // e.g. "2025-11"  
 
-    const labels = normalized.map((r) =>
-      r.date.toLocaleString(undefined, { month: "short", year: "numeric" })
-    );
-    const values = normalized.map((r) => Number(r.value || 0));
+  if (!grouped[month]) grouped[month] = { month, forecast: 0 };  
+  grouped[month].forecast += forecast;  
+});  
 
-    return { labels, values, material: normalized[0]?.material || "Material" };
-  };
+// Sort months chronologically  
+const sorted = Object.values(grouped).sort(  
+  (a, b) => new Date(a.month) - new Date(b.month)  
+);  
 
-  // Compute summary metrics via useMemo
-  const summary = useMemo(() => {
-    if (!data) return null;
-    const total = data.values.reduce((a, b) => a + b, 0);
-    const nextMonth = data.values[0] ?? 0;
-    const avg = data.values.length ? total / data.values.length : 0;
-    const trend = data.values.length >= 2 ? (data.values[data.values.length - 1] - data.values[0]) : 0;
-    return { total, nextMonth, avg, trend };
-  }, [data]);
+return sorted;
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchIfNeeded = async () => {
-      setError(null);
+}, [forecastData, selectedMaterial]);
 
-      // If consumer passed forecastData array, use it
-      if (forecastData && Array.isArray(forecastData) && forecastData.length > 0) {
-        const built = buildChartFromRows(forecastData);
-        if (!cancelled) setData(built);
-        return;
-      }
+// 🧮 Step 2: Generate AI-style insights
+const insight = useMemo(() => {
+if (!filteredData.length)
+return "Not enough data for generating forecast insights.";
 
-      // Otherwise if projectData exists, call /forecast endpoint
-      if (!projectData) {
-        setError("No project or forecast data provided");
-        return;
-      }
+const forecasts = filteredData.map((d) => d.forecast);  
+const first = forecasts[0];  
+const last = forecasts[forecasts.length - 1];  
+const change = ((last - first) / (first || 1)) * 100;  
 
-      // require filename + material
-      const filename = projectData.uploadedCsvFileName || projectData.csvFilename || projectData.filename;
-      const material = projectData.material;
-      const horizon = projectData.horizon_months || 6;
+const peak = Math.max(...forecasts);  
+const peakMonth = filteredData.find((d) => d.forecast === peak)?.month;  
 
-      if (!filename || !material) {
-        setError("Project is missing filename or material — can't fetch forecast");
-        return;
-      }
+let trend =  
+  change > 10  
+    ? "increasing steadily 📈"  
+    : change < -10  
+    ? "decreasing 📉"  
+    : "relatively stable ⚖️";  
 
-      try {
-        setLoading(true);
-        const form = new FormData();
-        form.append("filename", filename);
-        form.append("material", material);
-        form.append("horizon_months", horizon);
+const materialName =  
+  selectedMaterial === "All"  
+    ? "Overall material demand"  
+    : `${selectedMaterial} demand`;  
 
-        const res = await axios.post("http://127.0.0.1:8000/forecast", form);
-        if (cancelled) return;
-        const built = buildChartFromRows(res.data || []);
-        setData(built);
-      } catch (err) {
-        console.error("MaterialForecastChart fetch error:", err);
-        setError("Failed to fetch forecast from backend");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
+return `Forecast Insight: ${materialName} is ${trend}. Expected peak in ${new Date(  
+  peakMonth + "-01"  
+).toLocaleString("en-US", {  
+  month: "long",  
+  year: "numeric",  
+})} with approximately ${peak.toFixed(0)} tons.`;
 
-    fetchIfNeeded();
-    return () => { cancelled = true; };
-  }, [forecastData, projectData]);
+}, [filteredData, selectedMaterial]);
 
-  if (loading) return <div className="p-4 rounded-lg bg-gray-800/40 text-gray-200">Loading forecast...</div>;
-  if (error) return <div className="p-4 rounded-lg bg-red-700/20 text-red-200">Error: {error}</div>;
-  if (!data) return <div className="p-4 rounded-lg bg-gray-800/20 text-gray-300">No forecast data available</div>;
+// 🧩 Step 3: Short trend summary bar
+const materialTrends = useMemo(() => {
+if (!forecastData || forecastData.length === 0) return [];
 
-  const chartData = {
-    labels: data.labels,
-    datasets: [
-      {
-        label: `${data.material} — forecast`,
-        data: data.values,
-        fill: true,
-        tension: 0.35,
-        borderWidth: 2,
-        borderColor: "rgba(99,102,241,1)", // indigo-500
-        backgroundColor: "rgba(99,102,241,0.12)",
-        pointRadius: 3,
-      },
-    ],
-  };
+const mats = [...new Set(forecastData.map((f) => f.material))];  
 
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: { labels: { color: "white" } },
-      tooltip: { mode: "index", intersect: false },
-    },
-    scales: {
-      x: { ticks: { color: "#d1d5db" }, grid: { color: "#2b2b2b" } },
-      y: { ticks: { color: "#d1d5db" }, grid: { color: "#2b2b2b" } },
-    },
-  };
+return mats.map((mat) => {  
+  const matData = forecastData  
+    .filter((d) => d.material === mat)  
+    .sort((a, b) => new Date(a.forecast_date || a.date) - new Date(b.forecast_date || b.date));  
 
-  return (
-    <div className="bg-gradient-to-r from-[#0f172a] to-[#111827] p-4 rounded-xl shadow-md text-gray-100">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-xl font-semibold text-white mb-1">Material Forecast</h3>
-          <p className="text-sm text-gray-300">Predicted monthly usage for <span className="font-medium text-white">{data.material}</span></p>
-        </div>
+  if (matData.length < 2)  
+    return { material: mat, trend: "↔️ Stable", change: 0 };  
 
-        <div className="flex gap-3 items-center">
-          <div className="text-right">
-            <div className="text-sm text-gray-300">Next (month)</div>
-            <div className="text-lg font-bold">{Math.round(summary.nextMonth).toLocaleString()}</div>
-          </div>
+  const start = Number(  
+    matData[0].yhat ||  
+      matData[0].forecasted_demand ||  
+      matData[0].forecast ||  
+      0  
+  );  
+  const end = Number(  
+    matData[matData.length - 1].yhat ||  
+      matData[matData.length - 1].forecasted_demand ||  
+      matData[matData.length - 1].forecast ||  
+      0  
+  );  
 
-          <div className="text-right">
-            <div className="text-sm text-gray-300">Total (horizon)</div>
-            <div className="text-lg font-bold">{Math.round(summary.total).toLocaleString()}</div>
-          </div>
+  const change = ((end - start) / (start || 1)) * 100;  
+  let trend = "↔️ Stable";  
+  if (change > 8) trend = "📈 Rising";  
+  else if (change < -8) trend = "📉 Falling";  
 
-          <div className="text-right">
-            <div className="text-sm text-gray-300">Trend</div>
-            <div className={`text-lg font-bold ${summary.trend >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {summary.trend >= 0 ? "▲" : "▼"} {Math.abs(Math.round(summary.trend)).toLocaleString()}
-            </div>
-          </div>
-        </div>
-      </div>
+  return { material: mat, change: change.toFixed(1), trend };  
+});
 
-     <div className="mb-6">
-  <h2 className="text-lg font-semibold text-gray-200 mb-2">📊 AI Material Demand Forecast</h2>
+}, [forecastData]);
 
-  <div className="bg-gradient-to-r from-teal-500 via-emerald-500 to-green-600 p-4 rounded-xl shadow-lg text-white">
-    <h3 className="text-lg font-bold mb-2">
-      Material Forecast ({projectData?.material})
-    </h3>
-
-    <Line data={chartData} options={options} />
-
-    {/* AI Insight */}
-    <div className="mt-3 bg-white/10 backdrop-blur-md p-2 rounded-md text-sm">
-      📌 <b>Insight:</b> Forecast helps optimize material ordering and avoid stock delays 🚚✨  
-    </div>
-  </div>
+// 🧩 Step 4: Handle empty data gracefully
+if (!filteredData.length) {
+return (
+<div className="bg-[#111827] text-gray-300 border border-gray-700 rounded-2xl p-6 text-center shadow-md">
+<h2 className="text-lg font-semibold mb-2">📊 Material Forecast</h2>
+<p>No forecast data available yet.</p>
 </div>
-    </div>
-  );
+);
+}
+
+console.log("📊 Forecast Data Debug:", filteredData.slice(0, 10));
+
+return (
+<div className="bg-gradient-to-br from-[#0f2027] via-[#203a43] to-[#2c5364] p-6 rounded-3xl shadow-2xl text-gray-100">
+<h2 className="text-2xl font-semibold mb-4">
+📈 Material Forecast Trends
+</h2>
+
+<div className="w-full h-[360px] bg-[#111827] rounded-2xl shadow-inner p-3 mb-6">  
+    <ResponsiveContainer width="100%" height="100%">  
+      <LineChart data={filteredData}>  
+        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />  
+       <XAxis
+  dataKey="month"
+  label={{
+    value: "Month",
+    position: "insideBottomRight",
+    offset: -5,
+    fill: "#9ca3af",
+  }}
+  tickFormatter={(m) =>
+    new Date(m + "-01").toLocaleString("en-US", {
+      month: "short",
+      year: "numeric",
+    })
+  }
+  interval={0} // forces all months to show in order
+  tick={{ fill: "#e5e7eb", fontSize: 12 }}
+/>
+<YAxis
+  label={{
+    value: "Forecasted Demand (tons)",
+    angle: -90,
+    position: "insideLeft",
+    fill: "#9ca3af",
+  }}
+  tickFormatter={(val) => `${val.toFixed(0)}`}
+  tick={{ fill: "#e5e7eb", fontSize: 12 }}
+/>
+        <Tooltip  
+          contentStyle={{  
+            backgroundColor: "#1f2937",  
+            borderRadius: "10px",  
+            border: "1px solid #475569",  
+            color: "#f9fafb",  
+          }}  
+          formatter={(value) => [`${value.toFixed(1)} tons`, "Forecast"]}  
+        />  
+        <Line  
+          type="monotone"  
+          dataKey="forecast"  
+          stroke="#38bdf8"  
+          strokeWidth={3}  
+          dot={{ r: 4, fill: "#38bdf8" }}  
+          name="Forecasted Demand"  
+        />  
+      </LineChart>  
+    </ResponsiveContainer>  
+  </div>  
+
+  {/* 🧠 Forecast Insight */}  
+  <div className="bg-[#0f172a]/80 p-4 rounded-2xl border border-gray-700 mb-4 shadow-lg">  
+    <h3 className="text-lg font-semibold text-blue-300 mb-2">  
+      🔍 Forecast Insight  
+    </h3>  
+    <p className="text-gray-200 leading-relaxed">{insight}</p>  
+  </div>  
+
+  {/* 📊 Mini trend summary */}  
+  <div className="bg-[#1e293b]/70 p-4 rounded-2xl border border-gray-600 shadow-md">  
+    <h4 className="text-md font-semibold text-gray-100 mb-3">  
+      🌡️ Top Material Trends  
+    </h4>  
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">  
+      {materialTrends.map((t, i) => (  
+        <div  
+          key={i}  
+          className="bg-[#0f172a] rounded-xl p-3 text-center border border-gray-700 hover:border-blue-400 transition-all duration-300"  
+        >  
+          <span className="text-sm font-semibold text-gray-100 block mb-1">  
+            {t.material}  
+          </span>  
+          <span className="text-sm">{t.trend}</span>  
+          <span  
+            className={`text-xs mt-1 block ${  
+              t.change > 5  
+                ? "text-green-400"  
+                : t.change < -5  
+                ? "text-red-400"  
+                : "text-gray-400"  
+            }`}  
+          >  
+            {t.change}%  
+          </span>  
+        </div>  
+      ))}  
+    </div>  
+  </div>  
+</div>
+
+);
 };
 
 export default MaterialForecastChart;
