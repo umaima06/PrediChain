@@ -7,6 +7,7 @@ import MaterialForecastChart from "../components/MaterialForecastChart";
 import RecommendationPanel from "../components/RecommendationPanel";
 import HistoricalVsForecastChart from "../components/HistoricalVsForecastChart";
 import MaterialDashboard from "../components/MaterialDashboard";
+import FeatureImportancePanel from "../components/FeatureImportancePanel";
 import { getDashboardData } from "../services/dashboardService";
 import { useParams, useNavigate } from "react-router-dom";
 import MapPreview from "../components/MapPreview";
@@ -33,6 +34,8 @@ const Dashboard = () => {
   //   weatherAlertComponent = <WeatherAlert project={projectInfo} />;
   // }
   const [historicalData, setHistoricalData] = useState([]);
+  const [summary, setSummary] = useState({});
+  const [featureImportance, setFeatureImportance] = useState([]);
 
   // ✅ Fetch project info from Firestore
   useEffect(() => {
@@ -111,9 +114,23 @@ useEffect(() => {
       console.log("🚀 Sending dashboard payload:", payload);
 
       const result = await getDashboardData(payload);
+      
       setForecastData(result.forecast || []);
 setRecommendationsData(result.recommendations || []);
+setSummary(result.summary || {});
 setHistoricalData(result.historical || []); // ✅ new
+console.log("📊 Feature Importance from backend:", result.summary?.feature_importance);
+if (result.summary?.feature_importance) {
+  const formattedImportance = Object.entries(result.summary.feature_importance).map(
+    ([feature, importance]) => ({
+      feature,
+      importance: Number(importance) / 100,
+    })
+  );
+  setFeatureImportance(formattedImportance);
+} else {
+  setFeatureImportance([]);
+}
 
       // ✅ Backend will return array: forecast[] + recommendations[]
       const forecasts = (result.forecast || []).map(f => ({
@@ -328,6 +345,7 @@ const leadTime = selectedMaterial === "All"
   />
 </div>
 
+<FeatureImportancePanel featureImportance={featureImportance} />
 
 <div className="mt-10">
   {/* Full-width Material Forecast */}
@@ -380,14 +398,10 @@ const leadTime = selectedMaterial === "All"
 
 
     {/* ✅ Material table same width as charts */}
-  <MaterialDashboard
+ <MaterialDashboard
   materials={forecastData.map(item => {
     const matInfo = projectInfo.materials?.find(m => m.material === item.material) || {};
-
-    // Normalize historical quantity from backend
     const historicalTotal = item.quantity ?? item.historical_quantity ?? 0;
-
-  <RecommendationPanel recommendationsData={recommendationsData} />
 
     return {
       material: item.material || "Unknown",
@@ -398,6 +412,14 @@ const leadTime = selectedMaterial === "All"
       leadTime: matInfo.lead_time_days ?? 0,
     };
   })}
+  bulkOrders={recommendationsData.map(item => ({
+    material: item.material,
+    recommended_order_quantity: item.recommended_order_quantity,
+    urgency: item.urgency,
+    insight_reason: item.insight_reason,
+    recommended_order_date: item.recommended_order_date,
+  }))}
+  summary={summary}
 />
     </Layout>
   );

@@ -300,50 +300,6 @@ def recommend_procurement(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- Historical + Forecast combined endpoint ---
-@app.post("/historical_forecast")
-def historical_forecast(
-    filename: str = Form(...),
-    material: str = Form(...),
-    horizon_months: int = Form(6)
-):
-    """
-    Returns:
-      - historical: monthly aggregated historical usage for the material
-      - forecast: monthly forecast (from generate_forecast)
-    """
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    if not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail="CSV file not found")
-
-    df_hist = pd.read_csv(filepath)
-    df_hist.columns = [c.strip() for c in df_hist.columns]
-
-    # Historical monthly aggregation (if columns exist)
-    hist_out = []
-    try:
-        if 'Date_of_Materail_Usage' in df_hist.columns and 'Quantity_Used' in df_hist.columns:
-            df_hist['Date_of_Materail_Usage'] = pd.to_datetime(df_hist['Date_of_Materail_Usage'])
-            hist_monthly = (
-                df_hist[df_hist['Material_Name'].str.lower() == material.lower()]
-                .set_index('Date_of_Materail_Usage')
-                .resample('M')['Quantity_Used'].sum().reset_index()
-            )
-            hist_monthly.rename(columns={'Date_of_Materail_Usage': 'date', 'Quantity_Used': 'quantity'}, inplace=True)
-            hist_out = hist_monthly.to_dict(orient='records')
-    except Exception as e:
-        # If aggregation fails, return empty historical array and continue to forecast
-        hist_out = []
-
-    # Forecast
-    try:
-        forecast_df = generate_forecast(df_hist, material, horizon_months)
-        forecast_out = forecast_df.to_dict(orient='records')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Forecast failed: {e}")
-
-    return {"historical": hist_out, "forecast": forecast_out}
-
 # --- Combined dashboard payload endpoint ---
 @app.post("/dashboard-data")
 def dashboard_data(
@@ -369,125 +325,306 @@ def dashboard_data(
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="CSV file not found")
 
+    # read and normalize header spacing
     df_hist = pd.read_csv(filepath)
     df_hist.columns = [c.strip() for c in df_hist.columns]
 
-    print("=== Debug: /dashboard-data called ===")
-    print("Filename:", filename)
-    print("Raw material field:", materials)
+    # normalize common misspellings / variants to canonical names used downstream
+    rename_map = {
+        "Date_of_Materail_Usage": "Date_of_Material_Usage",
+        "Supllier_Reliability_Score": "Supplier_Reliability_Score",
+        "Supplier_Name": "Supplier_Name",
+        "Material_Name": "Material_Name",
+        "Quantity_Used": "Quantity_Used"
+    }
+    df_hist.rename(columns=rename_map, inplace=True)
 
+    # defensive: ensure any missing expected cols exist (with safe defaults)
+    if "Material_Name" not in df_hist.columns:
+        df_hist["Material_Name"] = ""
+    if "Quantity_Used" not in df_hist.columns:
+        df_hist["Quantity_Used"] = 0
+    # keep original copy for safety
+    df_hist_raw = df_hist.copy()
+
+    # parse materials param (JSON string expected)
     try:
         material_list = json.loads(materials)
-    except:
-        print("❌ JSON parse fail, fallback")
+    except Exception:
+        print("❌ JSON parse fail for materials; falling back to single-element list")
         material_list = [materials]
 
     all_forecasts = []
     all_recs = []
+    all_bulk_orders = []
     all_hist = []
 
-    # --- loop through materials ---
+    # feature importance accumulator (will compute per-material then aggregate)
+    feature_scores_acc = {
+        "seasonality": [],
+        "past_consumption": [],
+        "supplier_reliability": [],
+        "weather": [],
+        "regional_risk": []
+    }
+
     for matObj in material_list:
         mat = matObj["material"] if isinstance(matObj, dict) else matObj
+        mat = str(mat).strip()
         print(f"\n📦 Dashboard: processing material: {mat}")
 
-        # --- Forecast ---
+        # --- Forecast generation (keep your existing generate_forecast) ---
         try:
-            forecast_df = generate_forecast(df_hist, mat, horizon_months)
+            forecast_df = generate_forecast(df_hist_raw.copy(), mat, horizon_months)
+            print(f"Forecast rows for {mat}: {len(forecast_df)}")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Forecast failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Forecast failed for {mat}: {e}")
 
-        current_project_data = pd.DataFrame({
-            "material": [mat] * len(forecast_df),
-            "forecast_date": forecast_df['forecast_date'],
-            "lead_time_days": [lead_time_days] * len(forecast_df),
-            "current_inventory": [current_inventory] * len(forecast_df),
-            "supplier_reliability": [supplierReliability] * len(forecast_df),
-            "delivery_time_days": [deliveryTimeDays] * len(forecast_df),
-            "contractor_team_size": [contractorTeamSize] * len(forecast_df),
-            "project_budget": [projectBudget] * len(forecast_df),
-            "weather": [weather] * len(forecast_df),
-            "region_risk": [region_risk] * len(forecast_df),
-            "notes": [notes] * len(forecast_df),
-            "project_name": [projectName] * len(forecast_df),
-            "project_type": [projectType] * len(forecast_df),
-            "location": [location] * len(forecast_df),
-            "start_date": [startDate] * len(forecast_df),
-            "end_date": [endDate] * len(forecast_df),
-            "forecasted_demand": forecast_df['yhat']
-        })
+        # ensure forecast_df has columns we expect
+        if "forecast_date" not in forecast_df.columns and "ds" in forecast_df.columns:
+            forecast_df = forecast_df.rename(columns={"ds": "forecast_date"})
+        if "yhat" not in forecast_df.columns and "forecasted" in forecast_df.columns:
+            forecast_df["yhat"] = forecast_df["forecasted"]
 
-        # --- Recommendations ---
+        # --- Build current_project_data with identical-length arrays to avoid pandas length errors ---
+        forecast_len = len(forecast_df)
         try:
-            rec_df = generate_procurement_recommendations(
+            current_project_data = pd.DataFrame({
+                "material": [mat] * forecast_len,
+                "forecast_date": forecast_df["forecast_date"].values,
+                "lead_time_days": [lead_time_days] * forecast_len,
+                "current_inventory": [current_inventory] * forecast_len,
+                "supplier_reliability": [supplierReliability] * forecast_len,
+                "delivery_time_days": [deliveryTimeDays] * forecast_len,
+                "contractor_team_size": [contractorTeamSize] * forecast_len,
+                "project_budget": [projectBudget] * forecast_len,
+                "weather": [weather] * forecast_len,
+                "region_risk": [region_risk] * forecast_len,
+                "notes": [notes] * forecast_len,
+                "project_name": [projectName] * forecast_len,
+                "project_type": [projectType] * forecast_len,
+                "location": [location] * forecast_len,
+                "start_date": [startDate] * forecast_len,
+                "end_date": [endDate] * forecast_len,
+                "forecasted_demand": forecast_df["yhat"].values if "yhat" in forecast_df.columns else forecast_df.iloc[:, 1].values
+            })
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Project context DF build failed for {mat}: {e}")
+
+        # --- Generate recommendations (supports both tuple and single-return implementations) ---
+        try:
+            rec_out = generate_procurement_recommendations(
                 forecast_df=forecast_df,
                 current_project_data=current_project_data,
                 lead_time_days=lead_time_days,
                 current_inventory=current_inventory
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Recommendation generation failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Recommendation failed for {mat}: {e}")
 
+        # handle cases: function can return (rec_df, bulk_df) or just rec_df
+        rec_df = pd.DataFrame()
+        bulk_orders_df = pd.DataFrame()
+        if isinstance(rec_out, tuple) or isinstance(rec_out, list):
+            # expect (rec_df, bulk_orders_df)
+            try:
+                rec_df = rec_out[0] if rec_out[0] is not None else pd.DataFrame()
+                bulk_orders_df = rec_out[1] if len(rec_out) > 1 and rec_out[1] is not None else pd.DataFrame()
+            except Exception:
+                # fallback if returned weird object
+                if hasattr(rec_out, "to_dict"):
+                    rec_df = pd.DataFrame(rec_out)
+                else:
+                    rec_df = pd.DataFrame()
+        else:
+            # single return (DataFrame-like)
+            try:
+                rec_df = rec_out if isinstance(rec_out, pd.DataFrame) else pd.DataFrame(rec_out)
+            except Exception:
+                rec_df = pd.DataFrame()
+
+        # Make sure forecasted_demand exists in rec_df (rename if necessary)
+        if "yhat" in rec_df.columns and "forecasted_demand" not in rec_df.columns:
+            rec_df = rec_df.rename(columns={"yhat": "forecasted_demand"})
+        if "recommended_order_quantity" not in rec_df.columns and "recommended_order_quantity" in rec_df.columns:
+            pass  # already good
+        # If recommended_order_quantity missing but 'recommended_order' exists (older keys), try rename
+        if "recommended_order_quantity" not in rec_df.columns and "recommended_order" in rec_df.columns:
+            rec_df = rec_df.rename(columns={"recommended_order": "recommended_order_quantity"})
+
+        # --- Post-process rec_df: urgency & insight_reason (safe defaults) ---
+        if not rec_df.empty:
+            # ensure numeric forecasted_demand column
+            rec_df["forecasted_demand"] = pd.to_numeric(rec_df["forecasted_demand"].fillna(0), errors="coerce").fillna(0)
+            rec_df["recommended_order_quantity"] = pd.to_numeric(rec_df.get("recommended_order_quantity", 0), errors="coerce").fillna(0)
+
+            rec_df["urgency"] = rec_df.apply(
+                lambda row: "critical"
+                if current_inventory < row["forecasted_demand"] * 0.5
+                else ("urgent" if current_inventory < row["forecasted_demand"] * 1.2 else "ok"),
+                axis=1,
+            )
+
+            rec_df["insight_reason"] = rec_df["urgency"].map({
+                "critical": "Low stock vs forecast",
+                "urgent": "Stock nearing forecast threshold",
+                "ok": "Inventory level sufficient"
+            })
+        else:
+            # keep structure consistent
+            rec_df = pd.DataFrame(columns=["material", "forecast_date", "forecasted_demand",
+                                           "recommended_order_quantity", "recommended_order_date",
+                                           "urgency", "insight_reason"])
+
+        # attach material column to rec_df if missing
+        if "material" not in rec_df.columns:
+            rec_df["material"] = mat
+
+        # --- Append outputs to accumulators ---
         all_forecasts += forecast_df.to_dict(orient="records")
         all_recs += rec_df.to_dict(orient="records")
 
-        # --- Historical aggregation ---
+        if bulk_orders_df is not None and not bulk_orders_df.empty:
+            # annotate related materials for the bulk order
+            bulk_orders_df = bulk_orders_df.copy()
+            bulk_orders_df["related_materials"] = ", ".join(current_project_data["material"].unique())
+            all_bulk_orders += bulk_orders_df.to_dict(orient="records")
+
+        # --- Historical aggregation for this material (monthly) ---
         try:
-            df_hist.columns = [c.strip() for c in df_hist.columns]
+            # normalize date column names (accept both spelled variants)
+            df_local = df_hist_raw.copy()
+            if "Date_of_Material_Usage" in df_local.columns:
+                df_local = df_local.rename(columns={"Date_of_Material_Usage": "date"})
+            elif "Date_of_Materail_Usage" in df_local.columns:
+                df_local = df_local.rename(columns={"Date_of_Materail_Usage": "date"})
 
-            # Standardize date column
-            if "Date_of_Materail_Usage" in df_hist.columns:
-                df_hist.rename(columns={"Date_of_Materail_Usage": "date"}, inplace=True)
-            elif "Date_of_Material_Usage" in df_hist.columns:
-                df_hist.rename(columns={"Date_of_Material_Usage": "date"}, inplace=True)
+            df_local["date"] = pd.to_datetime(df_local["date"], errors="coerce")
+            df_local["Quantity_Used"] = pd.to_numeric(df_local.get("Quantity_Used", 0), errors="coerce").fillna(0)
+            df_local["Material_Name"] = df_local["Material_Name"].astype(str).str.strip().str.lower()
 
-            # Convert date & quantity
-            df_hist["date"] = pd.to_datetime(df_hist["date"], errors='coerce')
-            df_hist["Quantity_Used"] = pd.to_numeric(df_hist["Quantity_Used"], errors='coerce').fillna(0)
-
-            # Clean material names
-            df_hist["Material_Name"] = df_hist["Material_Name"].astype(str).str.strip().str.lower()
-
-            # Filter for material
             mat_lower = mat.strip().lower()
-            df_mat = df_hist[df_hist["Material_Name"] == mat_lower]
-            print(f"Material '{mat_lower}' filtered rows: {len(df_mat)}")
+            df_mat = df_local[df_local["Material_Name"] == mat_lower]
 
-            # Aggregate monthly
-            hist_monthly = df_mat.set_index("date").resample('M')["Quantity_Used"].sum().reset_index()
-            hist_monthly.rename(columns={"Quantity_Used": "quantity"}, inplace=True)
-            all_hist += hist_monthly.to_dict(orient='records')
-
+            if not df_mat.empty:
+                hist_monthly = df_mat.set_index("date").resample('M')["Quantity_Used"].sum().reset_index()
+                hist_monthly.rename(columns={"Quantity_Used": "quantity"}, inplace=True)
+                # attach material to each row for frontend convenience
+                for row in hist_monthly.to_dict(orient="records"):
+                    row["material"] = mat
+                    all_hist.append(row)
+            else:
+                print(f"⚠️ No historical data found for {mat}")
         except Exception as e:
-            print("❌ Historical aggregation failed for", mat, e)
-            all_hist += []
+            print(f"❌ Historical aggregation failed for {mat}: {e}")
 
-    # --- Summary / advice ---
-    total_forecast = sum([row["yhat"] for row in all_forecasts]) if all_forecasts else 0
-    next_month_forecast = float(all_forecasts[0]["yhat"]) if all_forecasts else 0
+        # --- Feature importance heuristics for this material (safe/simple) ---
+        try:
+            # seasonality: compare month-to-month variance vs overall variance
+            season_score = 0.0
+            if "forecast_date" in forecast_df.columns and not forecast_df["forecast_date"].isna().all():
+                f = forecast_df.copy()
+                f["forecast_date"] = pd.to_datetime(f["forecast_date"], errors="coerce")
+                f["month"] = f["forecast_date"].dt.month
+                month_means = f.groupby("month")["yhat"].mean()
+                if not month_means.empty:
+                    season_score = float(min(1.0, (month_means.std() / (month_means.mean() + 1e-6)) ))
+            # past consumption: correlation of lag-1 (autocorr) as proxy
+            past_score = 0.0
+            if not df_mat.empty:
+                q = df_mat.sort_values("date")["quantity"] if "quantity" in locals() else df_mat.sort_values("date")["Quantity_Used"]
+                if len(q) >= 3:
+                    past_score = abs(q.pct_change().fillna(0).autocorr(lag=1)) if hasattr(q.pct_change(), "autocorr") else float(min(1.0, q.std() / (q.mean() + 1e-6)))
+                else:
+                    past_score = 0.1
+            # supplier reliability: use provided supplierReliability value if present in matObj or current_project_data
+            supplier_score = 0.0
+            if ("Supplier_Reliability_Score" in df_local.columns) or ("supplier_reliability" in current_project_data.columns):
+                try:
+                    sr_vals = pd.to_numeric(df_local.get("Supplier_Reliability_Score", pd.Series([supplierReliability])), errors="coerce").fillna(supplierReliability)
+                    supplier_score = float(min(1.0, (100.0 - sr_vals.mean()) / 100.0))  # more unreliability increases importance
+                except Exception:
+                    supplier_score = 0.1
+            # weather/regional risk: check if columns exist and have variance
+            weather_score = 0.0
+            if "Weather_Condition" in df_local.columns:
+                weather_score = 0.2
+            regional_score = 0.0
+            if "Regional_Risk_Level" in df_local.columns:
+                regional_score = 0.1
 
-    advice = []
-    if current_inventory < next_month_forecast * 0.5:
-        advice.append("Inventory low — order soon.")
+            # clamp and accumulate
+            feature_scores_acc["seasonality"].append(max(0.0, min(1.0, season_score)))
+            feature_scores_acc["past_consumption"].append(max(0.0, min(1.0, past_score)))
+            feature_scores_acc["supplier_reliability"].append(max(0.0, min(1.0, supplier_score)))
+            feature_scores_acc["weather"].append(max(0.0, min(1.0, weather_score)))
+            feature_scores_acc["regional_risk"].append(max(0.0, min(1.0, regional_score)))
+        except Exception as e:
+            print(f"❌ Feature importance calc failed for {mat}: {e}")
+            # append small defaults
+            feature_scores_acc["seasonality"].append(0.1)
+            feature_scores_acc["past_consumption"].append(0.1)
+            feature_scores_acc["supplier_reliability"].append(0.05)
+            feature_scores_acc["weather"].append(0.05)
+            feature_scores_acc["regional_risk"].append(0.02)
+
+    # --- Inventory optimization insights (aggregate) ---
+    # Use get with defaults to avoid KeyError if structure changed upstream
+    total_forecast = sum([r.get("forecasted_demand", 0) for r in all_recs]) if all_recs else 0
+    total_recommended = sum([r.get("recommended_order_quantity", 0) for r in all_recs]) if all_recs else 0
+
+    insights = []
+    if total_recommended > total_forecast and total_forecast > 0:
+        insights.append("Bulk orders exceed forecast — consider splitting orders or adjusting suppliers.")
+    if any(r.get("urgency") == "critical" for r in all_recs):
+        insights.append("⚠️ Some materials are critically low — prioritize replenishment.")
     if supplierReliability < 80:
-        advice.append("Supplier reliability below 80% — add safety stock.")
-    if str(weather).lower() in ['rainy', 'humid'] or str(region_risk).lower() == 'high':
-        advice.append("Weather/region risk high — keep buffer stock.")
-    if not advice:
-        advice.append("Looks good. Monitor monthly usage.")
+        insights.append("Supplier reliability below 80% — add safety stock.")
+    if str(weather).lower() in ["rainy", "humid"]:
+        insights.append("Weather/region risk high — allow for delivery delays.")
+    if not insights:
+        insights.append("Looks good. Monitor monthly usage and supplier performance.")
 
-    summary = {
-        "total_forecast": total_forecast,
-        "current_inventory": current_inventory,
-        "avg_supplier_reliability": supplierReliability,
-        "budget": projectBudget,
-        "lead_time_days": lead_time_days
+    # --- Aggregate feature importance across materials (average & normalize to percent) ---
+    def avg_safe(lst):
+        return float(sum(lst) / len(lst)) if lst else 0.0
+
+    raw_scores = {
+        "seasonality": avg_safe(feature_scores_acc["seasonality"]),
+        "past_consumption": avg_safe(feature_scores_acc["past_consumption"]),
+        "supplier_reliability": avg_safe(feature_scores_acc["supplier_reliability"]),
+        "weather": avg_safe(feature_scores_acc["weather"]),
+        "regional_risk": avg_safe(feature_scores_acc["regional_risk"])
+    }
+    # normalize to 100%
+    total_raw = sum(raw_scores.values()) or 1.0
+    feature_importance = { 
+        "Seasonality": round((raw_scores["seasonality"] / total_raw) * 100, 1),
+        "Past Consumption": round((raw_scores["past_consumption"] / total_raw) * 100, 1),
+        "Supplier Reliability": round((raw_scores["supplier_reliability"] / total_raw) * 100, 1),
+        "Weather Impact": round((raw_scores["weather"] / total_raw) * 100, 1),
+        "Regional Risk": round((raw_scores["regional_risk"] / total_raw) * 100, 1)
     }
 
+    # --- Final summary (preserve your previous fields) ---
+    summary = {
+        "total_forecast_tons": round(total_forecast, 2),
+        "total_recommended_tons": round(total_recommended, 2),
+        "avg_supplier_reliability": supplierReliability,
+        "budget": projectBudget,
+        "lead_time_days": lead_time_days,
+        "insights": insights,
+        "feature_importance": feature_importance  # keep it inside summary
+        }
+
+    print("🔥 Feature Importance Computed:", feature_importance)
+    # ✅ Return regular FastAPI dict (not jsonify!)
     return {
         "forecast": all_forecasts,
         "recommendations": all_recs,
+        "bulk_orders": all_bulk_orders,
         "historical": all_hist,
+<<<<<<< HEAD
         "summary": summary,
         "advice": advice
     }
@@ -638,3 +775,7 @@ def recovery_smart_v3(payload: dict = Body(...)):
         return {"error": str(e)}
 
     
+=======
+        "summary": summary
+        }
+>>>>>>> abb8366 (added AI insights panel + enhanced MaterialDashboard with bulk orders, summaries, and normalized forecast data)
