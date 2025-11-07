@@ -137,7 +137,7 @@ const RecommendationPanel = ({ recommendationsData }) => {
             </p>
 
             <p className="text-gray-300 mb-1">
-              🏢 Supplier Reliability: {mat.nextRec.supplier_reliability ?? "N/A"}%
+              🏢 Supplier Reliability: {mat.nextRec.supplier_reliability != null ? `${mat.nextRec.supplier_reliability.toFixed(1)}%` : "N/A"}
             </p>
 
             {/* Insights */}

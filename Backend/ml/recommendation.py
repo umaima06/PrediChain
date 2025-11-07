@@ -14,16 +14,6 @@ def generate_procurement_recommendations(
     """
     Generates procurement recommendations by combining forecasted demand (historical trends)
     with current project data (real-time site conditions, suppliers, etc.).
-
-    Args:
-        forecast_df: DataFrame from forecast.py containing forecast_date, yhat, and material.
-        lead_time_days: Supplier lead time in days.
-        current_inventory: Material currently in stock.
-        safety_stock_percent: Buffer percentage of forecasted demand.
-        current_project_data: DataFrame with current project details (optional).
-
-    Returns:
-        DataFrame containing recommended order quantity, order date, and demand insights.
     """
 
     # ✅ Step 1: Validate required columns
@@ -34,9 +24,17 @@ def generate_procurement_recommendations(
     # ✅ Step 2: Start recommendation DataFrame
     recommendations = forecast_df.copy()
 
+    # 🟢 CRITICAL FIX A: Ensure 'forecast_date' is a proper datetime object
+    recommendations['forecast_date'] = pd.to_datetime(recommendations['forecast_date'], errors='coerce')
+    
+    # 🔴 CRITICAL FIX B: Prevent Negative Forecasts
+    recommendations['yhat'] = recommendations['yhat'].clip(lower=0) 
+
     # 🔄 Step 3: Merge current project data if provided
     if current_project_data is not None and not current_project_data.empty:
+        # Convert date column in project data for merging, if it exists
         if 'forecast_date' in current_project_data.columns:
+            current_project_data['forecast_date'] = pd.to_datetime(current_project_data['forecast_date'], errors='coerce')
             # Merge by forecast_date if available
             recommendations = recommendations.merge(
                 current_project_data, on='forecast_date', how='left', suffixes=('', '_proj')
@@ -51,19 +49,88 @@ def generate_procurement_recommendations(
     recommendations['safety_stock'] = recommendations['yhat'] * safety_stock_percent
     recommendations['total_need'] = recommendations['yhat'] + recommendations['safety_stock']
 
-    # ✅ Step 5: Adjust for Supplier Reliability (if present)
-    if 'Supplier_Reliability_Score' in recommendations.columns:
-        reliability = recommendations['Supplier_Reliability_Score'].fillna(100) / 100
-        reliability = reliability.clip(lower=0.1)  # prevent div/0
-        recommendations['total_need'] = recommendations['total_need'] / reliability
+    # 🟢 Step 5: Supplier Reliability Logic (Now with complete column normalization)
+    recommendations['material'] = recommendations['material'].str.strip().str.lower()
+    
+    if current_project_data is not None and not current_project_data.empty:
+        # 🟢 CRITICAL FIX D: Normalize ALL column names for reliable lookup 
+        # This ensures column matching works, even with hidden spaces.
+        current_project_data.columns = current_project_data.columns.str.strip().str.lower()
+
+        # Normalize material names
+        current_project_data['material'] = current_project_data['material'].astype(str).str.strip().str.lower()
+
+        # Handle different column names (now all lowercased to match the normalized columns)
+        possible_cols = ['supplier_reliability_score', 'supplierreliability', 'supplier_reliability'] 
+        found_col = next((c for c in possible_cols if c in current_project_data.columns), None)
+
+        if found_col:
+            # Convert to string and strip %
+            current_project_data[found_col] = (
+                current_project_data[found_col]
+                .astype(str).str.replace('%','').str.strip()
+            )
+
+            # CRITICAL FIX C: Use pd.to_numeric for error handling
+            current_project_data[found_col] = pd.to_numeric(
+                current_project_data[found_col], 
+                errors='coerce'
+            )
+            
+            # 🧩 FIX: Combine CSV history average with current project reliability input
+            # # --- 1️⃣ Historical Average from the uploaded Excel file
+            historical_avg = (
+                 current_project_data.groupby('material')[found_col]
+                 .mean()
+                 .fillna(100)
+                 .clip(0, 100)
+                 .to_dict()
+                 )
+            
+            # --- 2️⃣ Current project reliability input (from upload form)
+            # # Check if the user entered supplier reliability for this run
+            if 'supplierreliability' in current_project_data.columns:
+              current_inputs = (
+                   current_project_data.groupby('material')['supplierreliability']
+                   .mean().fillna(100)
+                   .clip(0, 100)
+                   .to_dict()
+                   )
+            else:
+                current_inputs = {}
+
+            # --- 3️⃣ Combine historical and current
+            combined_reliability = {}
+            for mat in set(historical_avg.keys()).union(current_inputs.keys()):
+                hist = historical_avg.get(mat, 100)
+                curr = current_inputs.get(mat, hist)  # if current not found, fallback to historical
+                combined_reliability[mat] = (hist + curr) / 2
+
+            # --- 4️⃣ Map the combined average to recommendations
+            recommendations['Supplier_Reliability_Score'] = (
+                recommendations['material'].map(combined_reliability)
+                .fillna(100)
+            )
+            
+            print("📊 Historical reliability:", historical_avg)
+            print("📈 Current input reliability:", current_inputs)
+            print("🧮 Combined reliability map:", combined_reliability)
+
+            
+            # Map the aggregated average reliability score back to the recommendations
+            recommendations['Supplier_Reliability_Score'] = (
+                recommendations['material'].map(combined_reliability)
+                .fillna(100) # Fallback again for materials that didn't map
+            )
+        else:
+            recommendations['Supplier_Reliability_Score'] = 100
+    else:
+        recommendations['Supplier_Reliability_Score'] = 100
 
     # ✅ Step 6: Calculate Recommended Order Quantity
     recommendations['recommended_order_quantity'] = (
         recommendations['total_need'] - current_inventory
     ).apply(lambda x: max(0, x)).round().astype(int)
-
-    # Reset inventory after first use
-    current_inventory = 0
 
     # ✅ Step 7: Determine Order Dates
     lead_time = pd.Timedelta(days=lead_time_days)
@@ -84,8 +151,11 @@ def generate_procurement_recommendations(
     # ✅ Step 9: Final Output Formatting
     final_output = recommendations[
         ['material', 'forecast_date', 'recommended_order_quantity', 
-         'recommended_order_date', 'yhat'] + optional_cols
-    ].rename(columns={'yhat': 'forecasted_demand'})
+         'recommended_order_date', 'yhat', 'Supplier_Reliability_Score'] + optional_cols
+         ].rename(columns={
+             'yhat': 'forecasted_demand',
+             'Supplier_Reliability_Score': 'supplier_reliability'
+             })
 
     # Only show months with positive order quantity
     final_output = final_output[final_output['recommended_order_quantity'] > 0]

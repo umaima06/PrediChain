@@ -205,7 +205,7 @@ const addMaterial = () => {
     horizon_months: formData.tempHorizon,
     lead_time_days: formData.tempLeadTime,
     current_inventory: formData.tempInventory,
-    supplierReliability: formData.tempSupplier,
+    supplierReliability: Number(formData.tempSupplier),
     deliveryTimeDays: formData.tempDelivery,
     contractorTeamSize: formData.tempTeam,
     projectBudget: formData.tempBudget
