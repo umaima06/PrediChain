@@ -14,6 +14,7 @@ import MapPreview from "../components/MapPreview";
 import FullMap from "./FullMap";
 import SmartAlertPopup from "../components/SmartAlertPopup";
 import axios from "axios";
+import SupplierReliabilityDonut from "../components/SupplierReliabilityDonut";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -277,6 +278,14 @@ const leadTime = selectedMaterial === "All"
     )
   : (Number(materialInfo?.lead_time_days) || projectInfo.lead_time_days);
 
+  // ✅ Extract supplier reliability data for donuts
+const suppliers =
+  (projectInfo.materials || []).map((m, index) => ({
+    name: m.supplierName || m.material || `Supplier ${index + 1}`,
+    reliability: m.supplierReliability || projectInfo.supplierReliability || 100,
+  }));
+
+
   return (
     <Layout projectName={projectInfo.projectName}projectStatus={projectInfo.status || "Active"}>
      <div className="flex items-center gap-3 mb-3">
@@ -347,6 +356,8 @@ const leadTime = selectedMaterial === "All"
 
 <FeatureImportancePanel featureImportance={featureImportance} />
 
+
+
 <div className="mt-10">
   {/* Full-width Material Forecast */}
   <MaterialForecastChart
@@ -357,6 +368,23 @@ const leadTime = selectedMaterial === "All"
   {/* Recommendation Panel below */}
   <div className="mt-8">
     <RecommendationPanel recommendationsData={recommendationsData} />
+  </div>
+</div>
+
+{/* 🧠 Supplier Reliability Donuts Section */}
+<div className="mt-10 bg-gray-900 p-6 rounded-xl shadow-lg">
+  <h2 className="text-xl font-semibold text-white mb-4">
+    Supplier Reliability Overview
+  </h2>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    {suppliers.map((s, index) => (
+      <SupplierReliabilityDonut
+        key={index}
+        supplierName={s.name}
+        reliability={s.reliability}
+      />
+    ))}
   </div>
 </div>
 
